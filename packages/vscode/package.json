@@ -1,0 +1,127 @@
+{
+    "name": "contextos",
+    "displayName": "ContextOS",
+    "description": "The Context Server Protocol for AI Coding - Build optimal LLM context from your codebase",
+    "version": "0.1.0",
+    "publisher": "contextos",
+    "engines": {
+        "vscode": "^1.85.0"
+    },
+    "categories": [
+        "Machine Learning",
+        "Other"
+    ],
+    "keywords": [
+        "ai",
+        "llm",
+        "context",
+        "copilot",
+        "code assistant"
+    ],
+    "activationEvents": [
+        "workspaceContains:.contextos"
+    ],
+    "main": "./dist/extension.js",
+    "contributes": {
+        "commands": [
+            {
+                "command": "contextos.init",
+                "title": "ContextOS: Initialize Project"
+            },
+            {
+                "command": "contextos.build",
+                "title": "ContextOS: Build Context"
+            },
+            {
+                "command": "contextos.copy",
+                "title": "ContextOS: Copy Context to Clipboard"
+            },
+            {
+                "command": "contextos.preview",
+                "title": "ContextOS: Preview Context"
+            },
+            {
+                "command": "contextos.doctor",
+                "title": "ContextOS: Run Health Check"
+            },
+            {
+                "command": "contextos.suggestRules",
+                "title": "ContextOS: Suggest Coding Rules"
+            }
+        ],
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "contextos",
+                    "title": "ContextOS",
+                    "icon": "media/icon.svg"
+                }
+            ]
+        },
+        "views": {
+            "contextos": [
+                {
+                    "id": "contextos.contextView",
+                    "name": "Context Preview"
+                },
+                {
+                    "id": "contextos.rulesView",
+                    "name": "Coding Rules"
+                }
+            ]
+        },
+        "configuration": {
+            "title": "ContextOS",
+            "properties": {
+                "contextos.autoIndex": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Automatically index project on save"
+                },
+                "contextos.geminiApiKey": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Gemini API key for AI features"
+                },
+                "contextos.targetModel": {
+                    "type": "string",
+                    "default": "gemini-3.0-pro",
+                    "enum": [
+                        "gemini-3.0-pro",
+                        "gpt-4-turbo",
+                        "gpt-4",
+                        "claude-3-opus",
+                        "claude-3-sonnet"
+                    ],
+                    "description": "Target LLM model for token budgeting"
+                }
+            }
+        },
+        "menus": {
+            "editor/context": [
+                {
+                    "command": "contextos.build",
+                    "group": "contextos"
+                }
+            ]
+        }
+    },
+    "scripts": {
+        "vscode:prepublish": "npm run compile",
+        "compile": "tsc -p ./",
+        "watch": "tsc -watch -p ./",
+        "package": "vsce package",
+        "lint": "eslint src --ext ts"
+    },
+    "devDependencies": {
+        "@types/node": "^20.11.0",
+        "@types/vscode": "^1.85.0",
+        "@typescript-eslint/eslint-plugin": "^7.0.0",
+        "@typescript-eslint/parser": "^7.0.0",
+        "eslint": "^8.57.0",
+        "typescript": "^5.4.0"
+    },
+    "dependencies": {
+        "@contextos/core": "workspace:*"
+    }
+}

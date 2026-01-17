@@ -1,0 +1,153 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "https://contextos.dev/schemas/config.yaml.json",
+    "title": "ContextOS Tool Configuration",
+    "description": "Schema for .contextos/config.yaml file",
+    "type": "object",
+    "properties": {
+        "indexing": {
+            "type": "object",
+            "description": "Indexing settings",
+            "properties": {
+                "watch_mode": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Auto-index on file changes"
+                },
+                "ignore_patterns": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "default": [
+                        "node_modules/**",
+                        "dist/**",
+                        ".git/**"
+                    ],
+                    "description": "Glob patterns to ignore"
+                },
+                "file_size_limit": {
+                    "type": "string",
+                    "default": "1MB",
+                    "description": "Skip files larger than this",
+                    "examples": [
+                        "500KB",
+                        "1MB",
+                        "2MB"
+                    ]
+                }
+            }
+        },
+        "graph": {
+            "type": "object",
+            "description": "Dependency graph settings",
+            "properties": {
+                "max_depth": {
+                    "type": "integer",
+                    "default": 2,
+                    "minimum": 1,
+                    "maximum": 5,
+                    "description": "How deep to follow imports"
+                },
+                "follow_types": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "enum": [
+                            "import",
+                            "require",
+                            "export",
+                            "dynamic"
+                        ]
+                    },
+                    "default": [
+                        "import",
+                        "require",
+                        "export"
+                    ],
+                    "description": "Types of dependencies to follow"
+                },
+                "include_types": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Include TypeScript type imports"
+                }
+            }
+        },
+        "embedding": {
+            "type": "object",
+            "description": "Vector embedding settings",
+            "properties": {
+                "strategy": {
+                    "type": "string",
+                    "enum": [
+                        "adaptive",
+                        "full",
+                        "lazy"
+                    ],
+                    "default": "adaptive",
+                    "description": "When to compute embeddings"
+                },
+                "provider": {
+                    "type": "string",
+                    "enum": [
+                        "local",
+                        "openai"
+                    ],
+                    "default": "local",
+                    "description": "Embedding provider"
+                },
+                "model": {
+                    "type": "string",
+                    "default": "all-MiniLM-L6-v2",
+                    "description": "Embedding model name"
+                },
+                "chunk_size": {
+                    "type": "integer",
+                    "default": 512,
+                    "minimum": 128,
+                    "maximum": 2048,
+                    "description": "Tokens per chunk"
+                },
+                "overlap": {
+                    "type": "integer",
+                    "default": 50,
+                    "minimum": 0,
+                    "maximum": 256,
+                    "description": "Token overlap between chunks"
+                }
+            }
+        },
+        "budgeting": {
+            "type": "object",
+            "description": "Token budget settings",
+            "properties": {
+                "strategy": {
+                    "type": "string",
+                    "enum": [
+                        "adaptive",
+                        "fixed"
+                    ],
+                    "default": "adaptive",
+                    "description": "Budget allocation strategy"
+                },
+                "target_model": {
+                    "type": "string",
+                    "default": "gpt-4-turbo",
+                    "enum": [
+                        "gpt-4-turbo",
+                        "gpt-4",
+                        "claude-3-opus",
+                        "claude-3-sonnet",
+                        "gemini-3-pro-preview"
+                    ],
+                    "description": "Target LLM for budget calculation"
+                },
+                "max_tokens": {
+                    "type": "integer",
+                    "description": "Override model default token limit"
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,43 @@
+{
+    "name": "@contextos/sdk",
+    "version": "0.1.0",
+    "description": "ContextOS SDK for tool builders and integrations",
+    "type": "module",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "import": "./dist/index.js",
+            "types": "./dist/index.d.ts"
+        }
+    },
+    "scripts": {
+        "build": "tsup src/index.ts --format esm --clean",
+        "dev": "tsup src/index.ts --format esm --dts --watch",
+        "test": "vitest run",
+        "lint": "eslint src/",
+        "clean": "rimraf dist"
+    },
+    "dependencies": {
+        "@contextos/core": "workspace:*"
+    },
+    "devDependencies": {
+        "@types/node": "^20.11.0",
+        "eslint": "^8.57.0",
+        "rimraf": "^5.0.5",
+        "tsup": "^8.0.2",
+        "typescript": "^5.4.0",
+        "vitest": "^1.4.0"
+    },
+    "files": [
+        "dist"
+    ],
+    "keywords": [
+        "contextos",
+        "sdk",
+        "ai",
+        "llm",
+        "context"
+    ],
+    "license": "MIT"
+}

@@ -1,0 +1,48 @@
+{
+    "name": "@contextos/core",
+    "version": "0.1.0",
+    "description": "Core engine for ContextOS - context management, parsing, and ranking",
+    "type": "module",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "import": "./dist/index.js",
+            "types": "./dist/index.d.ts"
+        }
+    },
+    "scripts": {
+        "build": "tsup src/index.ts --format esm --clean",
+        "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "test:coverage": "vitest run --coverage",
+        "lint": "eslint src/",
+        "clean": "rimraf dist"
+    },
+    "dependencies": {
+        "@xenova/transformers": "^2.17.0",
+        "better-sqlite3": "^11.0.0",
+        "chokidar": "^3.6.0",
+        "glob": "^10.3.0",
+        "tiktoken": "^1.0.15",
+        "web-tree-sitter": "^0.22.0",
+        "yaml": "^2.4.0",
+        "zod": "^3.23.0"
+    },
+    "devDependencies": {
+        "@types/better-sqlite3": "^7.6.9",
+        "eslint": "^8.57.0",
+        "rimraf": "^5.0.5",
+        "tsup": "^8.0.2",
+        "typescript": "^5.4.0",
+        "vitest": "^1.4.0"
+    },
+    "peerDependencies": {
+        "typescript": "^5.0.0"
+    },
+    "files": [
+        "dist"
+    ],
+    "license": "MIT"
+}

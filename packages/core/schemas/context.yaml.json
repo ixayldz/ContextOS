@@ -1,0 +1,200 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "https://contextos.dev/schemas/context.yaml.json",
+    "title": "ContextOS Context Configuration",
+    "description": "Schema for .contextos/context.yaml file",
+    "type": "object",
+    "required": [
+        "project"
+    ],
+    "properties": {
+        "version": {
+            "type": "string",
+            "default": "3.1",
+            "description": "Schema version",
+            "enum": [
+                "3.0",
+                "3.1"
+            ]
+        },
+        "project": {
+            "type": "object",
+            "description": "Project metadata",
+            "required": [
+                "name",
+                "language"
+            ],
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "Project name"
+                },
+                "language": {
+                    "type": "string",
+                    "description": "Primary programming language",
+                    "enum": [
+                        "typescript",
+                        "javascript",
+                        "python",
+                        "go",
+                        "rust",
+                        "java",
+                        "csharp",
+                        "php",
+                        "ruby"
+                    ]
+                },
+                "framework": {
+                    "type": "string",
+                    "description": "Framework or library",
+                    "examples": [
+                        "react",
+                        "nextjs",
+                        "nestjs",
+                        "express",
+                        "fastapi",
+                        "django",
+                        "gin",
+                        "actix"
+                    ]
+                },
+                "description": {
+                    "type": "string",
+                    "description": "Project description for context"
+                }
+            }
+        },
+        "stack": {
+            "type": "object",
+            "description": "Technology stack",
+            "properties": {
+                "database": {
+                    "type": "string",
+                    "examples": [
+                        "postgresql",
+                        "mysql",
+                        "mongodb",
+                        "sqlite",
+                        "redis"
+                    ]
+                },
+                "cache": {
+                    "type": "string",
+                    "examples": [
+                        "redis",
+                        "memcached"
+                    ]
+                },
+                "queue": {
+                    "type": "string",
+                    "examples": [
+                        "rabbitmq",
+                        "kafka",
+                        "bullmq",
+                        "sqs"
+                    ]
+                },
+                "auth": {
+                    "type": "string",
+                    "examples": [
+                        "jwt",
+                        "oauth2",
+                        "session",
+                        "firebase"
+                    ]
+                },
+                "hosting": {
+                    "type": "string",
+                    "examples": [
+                        "aws",
+                        "gcp",
+                        "azure",
+                        "vercel",
+                        "railway"
+                    ]
+                }
+            },
+            "additionalProperties": {
+                "type": "string"
+            }
+        },
+        "constraints": {
+            "type": "array",
+            "description": "Coding rules and constraints",
+            "items": {
+                "type": "object",
+                "required": [
+                    "rule"
+                ],
+                "properties": {
+                    "rule": {
+                        "type": "string",
+                        "description": "The constraint rule text"
+                    },
+                    "severity": {
+                        "type": "string",
+                        "enum": [
+                            "error",
+                            "warning",
+                            "info"
+                        ],
+                        "default": "warning",
+                        "description": "How strongly to enforce this rule"
+                    },
+                    "scope": {
+                        "type": "string",
+                        "description": "Glob pattern for files this rule applies to",
+                        "examples": [
+                            "src/controllers/**",
+                            "**/*.test.ts"
+                        ]
+                    }
+                }
+            }
+        },
+        "boundaries": {
+            "type": "array",
+            "description": "Module boundaries for architecture enforcement",
+            "items": {
+                "type": "object",
+                "required": [
+                    "name",
+                    "paths"
+                ],
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Boundary name"
+                    },
+                    "paths": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Glob patterns for files in this boundary"
+                    },
+                    "allowed_imports": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Patterns this boundary can import from"
+                    }
+                }
+            }
+        },
+        "meta": {
+            "type": "object",
+            "description": "Metadata (auto-managed by ContextOS)",
+            "properties": {
+                "last_indexed": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "index_version": {
+                    "type": "string"
+                }
+            }
+        }
+    }
+}

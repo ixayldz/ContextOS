@@ -140,6 +140,49 @@ Extensible architecture with marketplace:
 
 ---
 
+## 🎯 Universal Setup (TEK KOMUT!)
+
+Tüm AI araçlarınızı tek komutla ContextOS ile entegre edin:
+
+```bash
+npx @contextos/setup
+```
+
+### Desteklenen Araçlar
+
+| Araç | Tip | MCP Desteği |
+|------|-----|-------------|
+| **Claude Desktop** | IDE | ✅ Native |
+| **Claude Code CLI** | CLI | ✅ Native |
+| **Cursor** | IDE | ✅ Native |
+| **Windsurf** | IDE | ✅ Native |
+| **VS Code** | IDE | 🔌 Extension |
+| **Kilo Code** | IDE | ✅ Native |
+| **Codex CLI** | CLI | 📦 Wrapper |
+| **Gemini CLI** | CLI | 📦 Wrapper |
+| **OpenCode CLI** | CLI | 📦 Wrapper |
+| **Warp Terminal** | Terminal | 📦 Wrapper |
+
+```bash
+# Örnek çıktı:
+# 🚀 ContextOS Universal Setup
+#
+# Found 6 AI tool(s)
+#
+# 🖥️  IDEs:
+#    Claude Desktop MCP
+#    Cursor MCP
+#    Windsurf MCP
+#
+# ⌨️  CLI Tools:
+#    Claude Code CLI MCP
+#    Codex CLI Wrapper
+#
+# ✅ Setup complete: 5/5 tools configured
+```
+
+---
+
 ## 🚀 Hızlı Başlangıç
 
 ### Kurulum

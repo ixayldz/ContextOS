@@ -10,6 +10,7 @@ import type {
     RankedFile,
     Constraint,
 } from '../types.js';
+import { CHARS_PER_TOKEN_CODE } from '../constants.js';
 
 // Model token limits
 const MODEL_LIMITS: { [key: string]: number } = {
@@ -35,13 +36,17 @@ export class TokenBudget {
     }
 
     /**
-     * Count tokens in text (approximate)
-     * In production, use tiktoken for accurate counts
+     * Count tokens in text (improved approximation)
+     * Uses CHARS_PER_TOKEN_CODE constant for code-dense content
+     *
+     * Note: For production use, consider integrating tiktoken for accurate counts.
+     * This approximation works well for most code scenarios.
      */
     count(text: string): number {
-        // Approximate: ~4 characters per token for English text/code
-        // This is a rough estimate; tiktoken would be more accurate
-        return Math.ceil(text.length / 4);
+        if (!text) return 0;
+
+        // Use the defined constant for code token estimation
+        return Math.ceil(text.length / CHARS_PER_TOKEN_CODE);
     }
 
     /**
@@ -194,7 +199,7 @@ export class TokenBudget {
      * Truncate text to fit within token limit
      */
     private truncateToTokens(text: string, maxTokens: number): string {
-        const estimatedChars = maxTokens * 4;
+        const estimatedChars = maxTokens * CHARS_PER_TOKEN_CODE;
         if (text.length <= estimatedChars) return text;
 
         // Try to truncate at a natural boundary

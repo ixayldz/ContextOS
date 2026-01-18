@@ -7,6 +7,39 @@
 import type { ContextQueryAPI, OutlineItem } from './types.js';
 
 /**
+ * Regex pattern cache to avoid recompiling the same patterns
+ * Key is the pattern string, value is the compiled RegExp
+ */
+const patternCache = new Map<string, RegExp>();
+
+/**
+ * Get or create a cached regex pattern
+ */
+function getCachedPattern(key: string, pattern: string, flags: string = ''): RegExp {
+    const cacheKey = `${key}:${flags}`;
+    if (!patternCache.has(cacheKey)) {
+        patternCache.set(cacheKey, new RegExp(pattern, flags));
+    }
+    return patternCache.get(cacheKey)!;
+}
+
+/**
+ * Pre-compile and cache static patterns used in getImports and getExports
+ */
+const CACHED_IMPORT_PATTERNS = [
+    getCachedPattern('import-es6', '^import\\s+.+', ''),
+    getCachedPattern('import-python', '^from\\s+.+\\s+import\\s+.+', ''),
+    getCachedPattern('import-commonjs1', '^const\\s+.+=\\s*require\\(', ''),
+    getCachedPattern('import-commonjs2', '^require\\s*\\(', ''),
+];
+
+const CACHED_EXPORT_PATTERNS = [
+    getCachedPattern('export-default', '^export\\s+(default\\s+)?(class|function|const|let|interface|type|enum)', ''),
+    getCachedPattern('export-named', '^export\\s*\\{', ''),
+    getCachedPattern('export-commonjs', '^module\\.exports\\s*=', ''),
+];
+
+/**
  * Create a Context Query API instance for the given raw context
  * This API is injected into the sandbox and provides Python-like operations
  */
@@ -160,16 +193,10 @@ export function createContextAPI(rawContext: string): ContextQueryAPI {
 
         getImports: () => {
             const imports: string[] = [];
-            const importPatterns = [
-                /^import\s+.+/,              // ES6 import
-                /^from\s+.+\s+import\s+.+/,  // Python from import
-                /^const\s+.+=\s*require\(/,   // CommonJS require
-                /^require\s*\(/,              // require()
-            ];
 
             for (const line of lines) {
                 const trimmed = line.trim();
-                for (const pattern of importPatterns) {
+                for (const pattern of CACHED_IMPORT_PATTERNS) {
                     if (pattern.test(trimmed)) {
                         imports.push(trimmed);
                         break;
@@ -181,15 +208,10 @@ export function createContextAPI(rawContext: string): ContextQueryAPI {
 
         getExports: () => {
             const exports: string[] = [];
-            const exportPatterns = [
-                /^export\s+(default\s+)?(class|function|const|let|interface|type|enum)/,
-                /^export\s*\{/,
-                /^module\.exports\s*=/,
-            ];
 
             for (const line of lines) {
                 const trimmed = line.trim();
-                for (const pattern of exportPatterns) {
+                for (const pattern of CACHED_EXPORT_PATTERNS) {
                     if (pattern.test(trimmed)) {
                         exports.push(trimmed);
                         break;
@@ -203,17 +225,17 @@ export function createContextAPI(rawContext: string): ContextQueryAPI {
             const outline: OutlineItem[] = [];
             const patterns = {
                 function: [
-                    /^(?:export\s+)?(?:async\s+)?function\s+(\w+)\s*\(([^)]*)\)/,
-                    /^(?:export\s+)?(?:const|let)\s+(\w+)\s*=\s*(?:async\s+)?\([^)]*\)\s*=>/,
+                    getCachedPattern('outline-fn1', '^(?:export\\s+)?(?:async\\s+)?function\\s+(\\w+)\\s*\\(([^)]*)\\)'),
+                    getCachedPattern('outline-fn2', '^(?:export\\s+)?(?:const|let)\\s+(\\w+)\\s*=\\s*(?:async\\s+)?\\([^)]*\\)\\s*=>'),
                 ],
                 class: [
-                    /^(?:export\s+)?(?:abstract\s+)?class\s+(\w+)/,
+                    getCachedPattern('outline-class', '^(?:export\\s+)?(?:abstract\\s+)?class\\s+(\\w+)'),
                 ],
                 interface: [
-                    /^(?:export\s+)?interface\s+(\w+)/,
+                    getCachedPattern('outline-interface', '^(?:export\\s+)?interface\\s+(\\w+)'),
                 ],
                 type: [
-                    /^(?:export\s+)?type\s+(\w+)/,
+                    getCachedPattern('outline-type', '^(?:export\\s+)?type\\s+(\\w+)'),
                 ],
             };
 

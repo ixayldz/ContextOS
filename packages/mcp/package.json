@@ -1,7 +1,7 @@
 {
     "name": "@contextos/mcp",
-    "version": "0.2.0",
-    "description": "Model Context Protocol server for ContextOS - enables AI tools to access optimized context",
+    "version": "0.3.0",
+    "description": "Model Context Protocol server for ContextOS - enables all AI tools (Claude, Cursor, Codex, Gemini, Windsurf) to access optimized context",
     "type": "module",
     "main": "dist/index.js",
     "bin": {
@@ -27,7 +27,11 @@
         "ai",
         "context",
         "cursor",
-        "claude"
+        "claude",
+        "codex",
+        "gemini",
+        "windsurf",
+        "contextos"
     ],
     "author": "ContextOS Team",
     "license": "MIT"

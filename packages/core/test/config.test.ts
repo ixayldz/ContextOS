@@ -128,11 +128,24 @@ describe('Config Loader', () => {
 
     describe('isInitialized', () => {
         it('should return true when initialized', () => {
+            // isInitialized now also checks for context.yaml
+            const contextPath = join(contextosDir, 'context.yaml');
+            writeFileSync(contextPath, `
+version: "3.1"
+project:
+  name: test
+  language: typescript
+`);
             expect(isInitialized(testDir)).toBe(true);
         });
 
         it('should return false when not initialized', () => {
             rmSync(contextosDir, { recursive: true });
+            expect(isInitialized(testDir)).toBe(false);
+        });
+
+        it('should return false when only folder exists without context.yaml', () => {
+            // .contextos exists but context.yaml doesn't
             expect(isInitialized(testDir)).toBe(false);
         });
     });

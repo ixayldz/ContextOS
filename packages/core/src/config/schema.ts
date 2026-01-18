@@ -35,10 +35,27 @@ export const ConstraintSchema = z.object({
     related: z.array(z.string()).optional(),
 });
 
+// Helper to validate glob patterns are safe (basic validation)
+const isValidGlobPattern = (pattern: string): boolean => {
+    // Reject obviously dangerous patterns
+    const dangerousPatterns = [
+        /\.\./,  // Directory traversal
+        /^~/,    // Home directory access
+        /^\//,   // Absolute path (may be too restrictive)
+    ];
+    return !dangerousPatterns.some(p => p.test(pattern));
+};
+
 export const BoundarySchema = z.object({
     name: z.string().min(1),
-    allow: z.array(z.string()),
-    deny: z.array(z.string()),
+    allow: z.array(z.string()).refine(
+        patterns => patterns.every(isValidGlobPattern),
+        { message: 'Boundary patterns must not contain directory traversal (..) or absolute paths' }
+    ),
+    deny: z.array(z.string()).refine(
+        patterns => patterns.every(isValidGlobPattern),
+        { message: 'Boundary patterns must not contain directory traversal (..) or absolute paths' }
+    ),
 });
 
 export const MetaSchema = z.object({
@@ -61,6 +78,9 @@ export const ContextYamlSchema = z.object({
 // config.yaml Schema
 // ============================================================================
 
+// Helper to validate file size format (e.g., '1MB', '500KB', '2GB')
+const fileSizePattern = /^\d+(\.\d+)?\s*(B|KB|MB|GB|TB)$/i;
+
 export const IndexingConfigSchema = z.object({
     watch_mode: z.boolean().default(true),
     ignore_patterns: z.array(z.string()).default([
@@ -70,7 +90,11 @@ export const IndexingConfigSchema = z.object({
         'dist/**',
         '.git/**',
     ]),
-    file_size_limit: z.string().default('1MB'),
+    file_size_limit: z.string()
+        .default('1MB')
+        .refine(val => fileSizePattern.test(val), {
+            message: 'File size limit must be in format like "1MB", "500KB", "2GB", etc.'
+        }),
 });
 
 export const GraphConfigSchema = z.object({

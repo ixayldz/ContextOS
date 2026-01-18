@@ -7,6 +7,42 @@
 // Configuration Types
 // ============================================================================
 
+/**
+ * Strict backend options for model adapters
+ * Provides type-safe configuration for different LLM providers
+ */
+export interface BackendOptions {
+    /** API key for authentication */
+    apiKey?: string;
+
+    /** Custom base URL for API requests */
+    baseURL?: string;
+
+    /** Request timeout in milliseconds */
+    timeout?: number;
+
+    /** Maximum number of retries for failed requests */
+    maxRetries?: number;
+
+    /** Specific model to use */
+    model?: string;
+
+    /** Sampling temperature (0-2) */
+    temperature?: number;
+
+    /** Top-p sampling parameter */
+    topP?: number;
+
+    /** Maximum tokens to generate */
+    maxTokens?: number;
+
+    /** Custom headers for requests */
+    headers?: Record<string, string>;
+
+    /** Enable/disable streaming responses */
+    streaming?: boolean;
+}
+
 export interface RLMConfig {
     /** Maximum recursive depth for sub-agent spawning (default: 5) */
     maxDepth: number;
@@ -29,8 +65,8 @@ export interface RLMConfig {
     /** Model adapter to use (default: 'gemini') */
     backend: 'gemini' | 'openai' | 'anthropic' | 'local';
 
-    /** Backend-specific options */
-    backendOptions?: Record<string, unknown>;
+    /** Backend-specific options with strict typing */
+    backendOptions?: BackendOptions;
 
     /** Sandbox environment type (default: 'local') */
     environment: 'local' | 'docker' | 'modal';

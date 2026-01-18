@@ -1,63 +1,52 @@
-# ContextOS MCP Server
+# @contextos/mcp
 
-Model Context Protocol (MCP) server that enables AI tools like **Claude Code**, **Cursor**, **Windsurf** to access optimized context from ContextOS.
+**Model Context Protocol server for ContextOS**
 
-## Features
+[![npm version](https://img.shields.io/npm/v/@contextos/mcp?style=flat-square)](https://www.npmjs.com/package/@contextos/mcp)
 
-### 🔧 Tools
-AI can perform these actions:
+Enables AI coding tools to access ContextOS's optimized context through the [Model Context Protocol](https://modelcontextprotocol.io/).
 
-| Tool | Description |
+## 🎯 Supported Tools
+
+| Tool | Integration |
 |------|-------------|
-| `contextos_build` | Build optimized context for a goal |
-| `contextos_analyze` | Deep RLM-powered analysis |
-| `contextos_find` | Find files by pattern |
-| `contextos_deps` | Get file dependencies |
-| `contextos_explain` | Get file explanation |
-| `contextos_status` | Check ContextOS status |
+| Claude Desktop | ✅ Native MCP |
+| Claude Code CLI | ✅ Native MCP |
+| Cursor | ✅ Native MCP |
+| Windsurf | ✅ Native MCP |
+| Kilo Code | ✅ Native MCP |
+| VS Code + Continue.dev | ✅ Native MCP |
 
-### 📚 Resources
-AI can read these data sources:
+## 🚀 Quick Setup
 
-| Resource | Description |
-|----------|-------------|
-| `contextos://context/current` | Last built context |
-| `contextos://project/info` | Project configuration |
-| `contextos://project/constraints` | Coding rules |
-| `contextos://project/structure` | Directory tree |
+### Recommended: Use Universal Setup
 
-### 💬 Prompts
-Pre-built prompt templates:
+```bash
+npx @contextos/setup
+```
 
-| Prompt | Description |
-|--------|-------------|
-| `code_with_context` | Start coding with context |
-| `review_code` | Review file with deps |
-| `debug_issue` | Debug with context |
+This automatically configures all your AI tools.
 
----
+### Manual Configuration
 
-## Installation
+#### Claude Desktop / Claude Code CLI
 
-### For Claude Desktop
-
-Add to your Claude Desktop config (`claude_desktop_config.json`):
+Add to `~/.config/claude/claude_desktop_config.json` (Linux/macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
 
 ```json
 {
   "mcpServers": {
     "contextos": {
       "command": "npx",
-      "args": ["@contextos/mcp"],
-      "cwd": "/path/to/your/project"
+      "args": ["-y", "@contextos/mcp"]
     }
   }
 }
 ```
 
-### For Cursor
+#### Cursor
 
-Add to Cursor settings:
+Add to settings.json:
 
 ```json
 {
@@ -70,52 +59,139 @@ Add to Cursor settings:
 }
 ```
 
-### Global Installation
+#### Windsurf
+
+Add to settings.json:
+
+```json
+{
+  "mcp.servers": {
+    "contextos": {
+      "command": "npx @contextos/mcp",
+      "cwd": "${workspaceFolder}"
+    }
+  }
+}
+```
+
+## 🔧 MCP Capabilities
+
+### Tools
+
+| Tool | Description |
+|------|-------------|
+| `contextos_build` | Build optimized context for a goal |
+| `contextos_analyze` | Deep analysis using RLM engine |
+| `contextos_find` | Find files matching a pattern |
+| `contextos_deps` | Get file dependencies |
+| `contextos_explain` | Explain a file's purpose |
+| `contextos_status` | Get ContextOS status |
+
+### Resources
+
+| Resource | Description |
+|----------|-------------|
+| `contextos://context/current` | Current built context |
+| `contextos://project/info` | Project information |
+| `contextos://project/constraints` | Coding constraints |
+| `contextos://project/structure` | File tree structure |
+
+### Prompts
+
+| Prompt | Description |
+|--------|-------------|
+| `code_with_context` | Start coding with full context |
+| `review_code` | Review code with dependencies |
+| `debug_issue` | Debug with relevant context |
+
+## 📋 Usage Examples
+
+Once configured, your AI assistant can use ContextOS automatically:
+
+**Example Chat:**
+
+```
+You: Add rate limiting to the AuthController
+
+AI: [Calls contextos_build("Add rate limiting to AuthController")]
+AI: Based on the context, I can see AuthController.ts imports RateLimitMiddleware...
+    Here's the implementation:
+    ...
+```
+
+**Example with Tools:**
+
+```
+You: What does PaymentService depend on?
+
+AI: [Calls contextos_deps("src/payment/PaymentService.ts")]
+AI: PaymentService depends on:
+    - src/payment/StripeClient.ts
+    - src/user/UserRepository.ts
+    - src/common/Logger.ts
+```
+
+## 🏗️ How It Works
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     AI Tool (Cursor, Claude, etc.)           │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              │ MCP Protocol
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    @contextos/mcp                            │
+│                                                              │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐       │
+│  │    Tools     │  │  Resources   │  │   Prompts    │       │
+│  │  (Actions)   │  │   (Data)     │  │ (Templates)  │       │
+│  └──────────────┘  └──────────────┘  └──────────────┘       │
+│                              │                               │
+│                              ▼                               │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │                 @contextos/core                      │    │
+│  │  RLM Engine | Hybrid Ranker | Parser | Graph | etc.  │    │
+│  └─────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    Your Codebase                             │
+│  .contextos/ | src/ | package.json | ...                     │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## 🔍 Debugging
+
+### Check if MCP server starts correctly
 
 ```bash
-npm install -g @contextos/mcp
-contextos-mcp
+npx @contextos/mcp
 ```
 
----
+You should see: `ContextOS MCP Server started`
 
-## Usage
-
-Once configured, the AI tool will automatically have access to ContextOS features.
-
-### Example: Building Context
-
-The AI can call:
-```
-Use the contextos_build tool with goal "Add authentication to UserController"
-```
-
-And receive optimized context automatically.
-
-### Example: Reading Project Info
-
-The AI can read:
-```
-Read the contextos://project/info resource
-```
-
----
-
-## Development
+### Enable debug logging
 
 ```bash
-# Install dependencies
-pnpm install
-
-# Build
-pnpm build
-
-# Run locally
-pnpm start
+DEBUG=contextos:* npx @contextos/mcp
 ```
 
----
+### Check tool logs
 
-## License
+Most MCP-compatible tools have a developer console or log file where you can see MCP communication.
 
-MIT
+## 📦 Requirements
+
+- Node.js 18+
+- A ContextOS-initialized project (`npx @contextos/cli init`)
+- An MCP-compatible AI tool
+
+## 🤝 Contributing
+
+Found an issue or want to add support for a new tool? Open an issue or PR!
+
+## 📄 License
+
+MIT © ContextOS Team

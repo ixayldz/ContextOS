@@ -17,7 +17,7 @@
         "test": "vitest run",
         "test:watch": "vitest",
         "test:coverage": "vitest run --coverage",
-        "lint": "eslint src/",
+        "lint": "eslint \"src/**/*.ts\"",
         "clean": "rimraf dist"
     },
     "dependencies": {
@@ -32,6 +32,8 @@
     },
     "devDependencies": {
         "@types/better-sqlite3": "^7.6.9",
+        "@typescript-eslint/eslint-plugin": "^7.0.0",
+        "@typescript-eslint/parser": "^7.0.0",
         "eslint": "^8.57.0",
         "rimraf": "^5.0.5",
         "tsup": "^8.0.2",

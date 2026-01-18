@@ -22,6 +22,12 @@ import {
     createObservationMessage,
     createSubAgentResultMessage,
 } from './prompts.js';
+import {
+    DEFAULT_TIMEOUT,
+    SANDBOX_TIMEOUT_RATIO,
+    MAX_VISITED_PATHS,
+    PATH_CLEANUP_BATCH_SIZE,
+} from '../constants.js';
 
 /**
  * RLM Engine - Main entry point for recursive language model execution
@@ -35,7 +41,7 @@ export class RLMEngine {
     constructor(options: Partial<RLMConfig> = {}) {
         this.config = { ...DEFAULT_RLM_CONFIG, ...options };
         this.sandbox = createSandbox(this.config.environment, {
-            timeout: Math.min(10000, this.config.timeoutMs / 10),
+            timeout: Math.min(DEFAULT_TIMEOUT, this.config.timeoutMs / SANDBOX_TIMEOUT_RATIO),
         });
         this.executionId = this.generateExecutionId();
     }
@@ -221,12 +227,12 @@ export class RLMEngine {
 
                 state.visitedPaths.set(pathKey, now);
 
-                // Cleanup: keep only last 50 entries to prevent memory leak
-                if (state.visitedPaths.size > 50) {
+                // Cleanup: keep only last MAX_VISITED_PATHS entries to prevent memory leak
+                if (state.visitedPaths.size > MAX_VISITED_PATHS) {
                     const entries = Array.from(state.visitedPaths.entries());
                     entries.sort((a, b) => a[1] - b[1]); // Sort by timestamp (oldest first)
-                    // Remove oldest 10 entries
-                    for (let i = 0; i < 10; i++) {
+                    // Remove oldest PATH_CLEANUP_BATCH_SIZE entries
+                    for (let i = 0; i < PATH_CLEANUP_BATCH_SIZE; i++) {
                         state.visitedPaths.delete(entries[i][0]);
                     }
                 }

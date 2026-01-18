@@ -1,7 +1,7 @@
 {
     "name": "@contextos/setup",
-    "version": "0.1.0",
-    "description": "One-click setup for ContextOS - automatically configure all your IDEs",
+    "version": "0.2.0",
+    "description": "Universal setup for ContextOS - one command to configure all AI coding tools (Claude, Cursor, Codex, Gemini, Windsurf, VS Code, Kilo Code, Warp)",
     "type": "module",
     "bin": {
         "contextos-setup": "./dist/index.js"
@@ -36,9 +36,17 @@
         "setup",
         "mcp",
         "claude",
+        "claude-code",
         "cursor",
         "windsurf",
+        "vscode",
+        "codex",
+        "gemini",
+        "opencode",
+        "warp",
+        "kilocode",
         "ai",
-        "coding"
+        "coding",
+        "context"
     ]
 }

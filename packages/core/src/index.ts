@@ -77,6 +77,9 @@ export * from './errors.js';
 // Logger
 export * from './logger.js';
 
+// Telemetry (Metrics, Tracing, Error Reporting)
+export * from './telemetry/index.js';
+
 // AI Generator
 export * from './generator/index.js';
 export * from './generator/shadow-fs.js';

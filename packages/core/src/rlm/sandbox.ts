@@ -220,24 +220,74 @@ export function prepareSandboxVariables(
 /**
  * Validate that code doesn't contain dangerous patterns
  * Returns array of detected issues
+ *
+ * SECURITY: This is a critical function - ensures RLM sandbox cannot escape
  */
 export function validateCode(code: string): string[] {
     const issues: string[] = [];
 
     const dangerousPatterns = [
+        // Module system bypasses
         { pattern: /\brequire\s*\(/, message: 'require() is not allowed' },
         { pattern: /\bimport\s*\(/, message: 'Dynamic import() is not allowed' },
-        { pattern: /\bprocess\./, message: 'process access is not allowed' },
-        { pattern: /\bglobal\./, message: 'global access is not allowed' },
-        { pattern: /\bglobalThis\./, message: 'globalThis access is not allowed' },
+        { pattern: /\bimport\s+\.+/, message: 'Relative import is not allowed' },
+
+        // Global object access
+        { pattern: /\bprocess\s*\./, message: 'process property access is not allowed' },
+        { pattern: /\bprocess\s*$/, message: 'process variable access is not allowed' },
+        { pattern: /\bglobal\s*\./, message: 'global access is not allowed' },
+        { pattern: /\bglobal\s*$/, message: 'global variable access is not allowed' },
+        { pattern: /\bglobalThis\s*\./, message: 'globalThis access is not allowed' },
+        { pattern: /\bglobalThis\s*$/, message: 'globalThis variable access is not allowed' },
+
+        // Code execution
         { pattern: /\beval\s*\(/, message: 'eval() is not allowed' },
         { pattern: /\bFunction\s*\(/, message: 'Function constructor is not allowed' },
-        { pattern: /\bchild_process/, message: 'child_process is not allowed' },
-        { pattern: /\bfs\./, message: 'fs module is not allowed' },
+        { pattern: /\bnew\s+Function\s*\(/, message: 'new Function() is not allowed' },
+        { pattern: /\bsetTimeout\s*\(/, message: 'setTimeout() is not allowed' },
+        { pattern: /\bsetInterval\s*\(/, message: 'setInterval() is not allowed' },
+        { pattern: /\bsetImmediate\s*\(/, message: 'setImmediate() is not allowed' },
+
+        // Child process and system access
+        { pattern: /\bchild_process/, message: 'child_process module is not allowed' },
         { pattern: /\bexec\s*\(/, message: 'exec() is not allowed' },
         { pattern: /\bspawn\s*\(/, message: 'spawn() is not allowed' },
+        { pattern: /\bfork\s*\(/, message: 'fork() is not allowed' },
+        { pattern: /\bexecSync\s*\(/, message: 'execSync() is not allowed' },
+
+        // File system access
+        { pattern: /\bfs\s*\./, message: 'fs module access is not allowed' },
+        { pattern: /\bfs\s*$/, message: 'fs module variable is not allowed' },
+        { pattern: /\brequire\s*\(\s*['"]fs['"]/, message: 'fs module require is not allowed' },
+
+        // Directory traversal
+        { pattern: /\bprocess\s*\.\s*chdir\s*\(/, message: 'process.chdir() is not allowed' },
+        { pattern: /\bprocess\s*\.\s*cwd\s*\(/, message: 'process.cwd() is not allowed' },
+
+        // Buffer exploits
+        { pattern: /\bBuffer\s*\./, message: 'Buffer static methods are not allowed' },
+        { pattern: /\bnew\s+Buffer\s*\(/, message: 'new Buffer() is not allowed' },
+
+        // Prototype pollution
         { pattern: /\b__proto__/, message: '__proto__ access is not allowed' },
-        { pattern: /\bconstructor\s*\[/, message: 'constructor access is not allowed' },
+        { pattern: /\bconstructor\s*\[/, message: 'constructor array access is not allowed' },
+        { pattern: /\bprototype\s*\./, message: 'prototype modification is not allowed' },
+        { pattern: /\bObject\s*\.\s*prototype/, message: 'Object.prototype modification is not allowed' },
+
+        // Reflect and Proxy exploits
+        { pattern: /\bReflect\s*\.\s*set\s*\(/, message: 'Reflect.set() is not allowed' },
+        { pattern: /\bnew\s+Proxy\s*\(/, message: 'Proxy constructor is not allowed' },
+
+        // Async function exploits
+        { pattern: /\basync\s+Function\s*\(/, message: 'async Function constructor is not allowed' },
+
+        // Module and namespace access
+        { pattern: /\bmodule\s*\./, message: 'module access is not allowed' },
+        { pattern: /\bmodule\s*$/, message: 'module variable access is not allowed' },
+        { pattern: /\bexports\s*\./, message: 'exports access is not allowed' },
+        { pattern: /\bexports\s*$/, message: 'exports variable access is not allowed' },
+        { pattern: /\b__dirname/, message: '__dirname access is not allowed' },
+        { pattern: /\b__filename/, message: '__filename access is not allowed' },
     ];
 
     for (const { pattern, message } of dangerousPatterns) {

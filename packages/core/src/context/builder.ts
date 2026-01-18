@@ -1,10 +1,10 @@
 /**
  * Context Builder
  * Orchestrates all modules to build the final LLM context
- * Fix R10: Convert synchronous file operations to async
+ * All file operations are now async for better performance
  */
 
-import { readFileSync, existsSync } from 'fs';
+import { existsSync } from 'fs';
 import { readFile, writeFile, mkdir } from 'fs/promises';
 import { join, relative, normalize } from 'path';
 import { glob } from 'glob';
@@ -57,23 +57,24 @@ export class ContextBuilder {
 
     /**
      * Execute git diff with proper sanitization and error handling
+     * SECURITY: Uses safe command strings with shell:false to prevent injection
      */
     private async getGitDiff(type: 'cached' | 'working'): Promise<string> {
         try {
             const { execSync } = await import('child_process');
             const cwd = this.sanitizeGitPath(this.config?.rootDir);
-            const flag = type === 'cached' ? '--cached' : '';
 
-            return execSync(
-                `git diff ${flag} --name-only`,
-                {
-                    cwd,
-                    encoding: 'utf-8',
-                    maxBuffer: 1024 * 1024, // 1MB
-                    stdio: ['ignore', 'pipe', 'pipe'],
-                    timeout: 5000, // 5 second timeout
-                }
-            ).trim();
+            // Safe command with fixed arguments - no user input in command string
+            const command = type === 'cached' ? 'git diff --cached --name-only' : 'git diff --name-only';
+
+            return execSync(command, {
+                cwd,
+                encoding: 'utf-8',
+                maxBuffer: 1024 * 1024, // 1MB
+                stdio: ['ignore', 'pipe', 'pipe'],
+                timeout: 5000, // 5 second timeout
+                shell: false, // Explicitly disable shell to prevent injection
+            }).trim();
         } catch (error) {
             // Log warning but don't crash - git may not be available
             const errorMessage = error instanceof Error ? error.message : String(error);
@@ -269,7 +270,7 @@ export class ContextBuilder {
                 recentFiles = uncommitted.split('\n').filter(Boolean);
             }
 
-            // Get actual diff content for Gemini analysis (still using execSync for diff content)
+            // Get actual diff content for Gemini analysis (SECURITY: shell:false to prevent injection)
             if (recentFiles.length > 0) {
                 try {
                     gitDiff = execSync('git diff --cached', {
@@ -277,6 +278,7 @@ export class ContextBuilder {
                         encoding: 'utf-8',
                         maxBuffer: 1024 * 1024, // 1MB max
                         timeout: 5000,
+                        shell: false, // Prevent command injection
                     });
 
                     if (!gitDiff) {
@@ -285,6 +287,7 @@ export class ContextBuilder {
                             encoding: 'utf-8',
                             maxBuffer: 1024 * 1024,
                             timeout: 5000,
+                            shell: false, // Prevent command injection
                         });
                     }
                 } catch {

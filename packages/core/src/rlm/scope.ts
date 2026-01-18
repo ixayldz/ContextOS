@@ -262,13 +262,14 @@ export class ScopeManager {
             case 'always':
                 return true;
 
-            case 'goal_contains':
+            case 'goal_contains': {
                 const values = Array.isArray(condition.value)
                     ? condition.value
                     : [condition.value || ''];
                 return values.some(v => goalLower.includes(v.toLowerCase()));
+            }
 
-            case 'file_in':
+            case 'file_in': {
                 if (!targetFiles) return false;
                 const patterns = Array.isArray(condition.value)
                     ? condition.value
@@ -276,6 +277,7 @@ export class ScopeManager {
                 return targetFiles.some(file =>
                     patterns.some(pattern => this.matchGlob(file, pattern))
                 );
+            }
 
             case 'tag_is':
                 // Would need tag context to implement

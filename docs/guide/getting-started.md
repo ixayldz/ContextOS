@@ -1,107 +1,149 @@
 # Getting Started
 
-Learn how to set up ContextOS in your project in under 5 minutes.
+This guide will get you up and running with ContextOS in under 5 minutes.
 
 ## Prerequisites
 
-- Node.js 18 or higher
-- pnpm, npm, or yarn
+- **Node.js 18+** - [Download](https://nodejs.org/)
+- **A project** - Any codebase in TypeScript, JavaScript, Python, Go, Rust, or Java
+- **An AI tool** - Claude, Cursor, VS Code, Codex CLI, etc.
 
-## Installation
+## Step 1: Setup Your AI Tools
 
-::: code-group
+The easiest way to start is with our universal setup:
 
-```bash [npm]
-npm install -g @contextos/cli
+```bash
+npx @contextos/setup
 ```
 
-```bash [pnpm]
-pnpm add -g @contextos/cli
+This automatically detects and configures all your installed AI tools:
+
+```
+🚀 ContextOS Universal Setup
+
+Found 4 AI tool(s)
+
+🖥️  IDEs:
+   Claude Desktop MCP
+   Cursor MCP
+
+⌨️  CLI Tools:
+   Claude Code CLI MCP
+   Codex CLI Wrapper
+
+✅ Setup complete: 4/4 tools configured
 ```
 
-```bash [yarn]
-yarn global add @contextos/cli
-```
+## Step 2: Initialize Your Project
 
-:::
-
-## Initialize Your Project
-
-Navigate to your project directory and run:
+Navigate to your project and initialize ContextOS:
 
 ```bash
 cd your-project
-ctx init
+npx @contextos/cli init
 ```
 
-This creates the `.contextos/` folder:
+This creates a `.contextos` directory with:
 
 ```
 .contextos/
-├── context.yaml      # Project definition
-├── config.yaml       # Tool settings
-├── db/               # Vector store & graph
-└── rules/
-    └── coding.md     # Coding guidelines
+├── context.yaml      # Project configuration
+├── db/               # Vector index database
+└── cache/            # Built context cache
 ```
 
-## Set Up API Keys
+## Step 3: Index Your Codebase
 
-ContextOS uses AI for intelligent features. Set your API key:
-
-::: code-group
-
-```bash [Gemini (recommended)]
-export GEMINI_API_KEY="your-key-here"
-```
-
-```bash [OpenAI]
-export OPENAI_API_KEY="your-key-here"
-```
-
-```bash [Anthropic]
-export ANTHROPIC_API_KEY="your-key-here"
-```
-
-:::
-
-## Index Your Codebase
-
-Build the project index (one-time, then incremental):
+Build the semantic index:
 
 ```bash
-ctx index
+npx @contextos/cli index
 ```
 
-This creates:
-- Dependency graph of all files
-- Vector embeddings for semantic search
-- AST analysis for code structure
+This:
+1. Parses your code with Tree-sitter
+2. Builds a dependency graph
+3. Creates vector embeddings for semantic search
 
-## Build Your First Context
-
-Now you can build optimized context for any goal:
+## Step 4: Set a Goal & Build Context
 
 ```bash
-# With explicit goal
-ctx goal "Add rate limiting to AuthController"
+# Set what you're working on
+npx @contextos/cli goal "Add rate limiting to AuthController"
 
-# Or auto-infer from git changes
-ctx build
+# Build optimized context
+npx @contextos/cli build
+
+# Copy to clipboard
+npx @contextos/cli copy
 ```
 
-## Copy and Use
-
-Copy the context to your clipboard:
+Or in one command:
 
 ```bash
-ctx copy
+npx @contextos/cli goal "Add rate limiting to AuthController" --copy
 ```
 
-Then paste into your AI assistant (ChatGPT, Claude, Gemini) with perfect context!
+## Step 5: Use with Your AI Tool
 
-## Next Steps
+### With Claude Desktop / Cursor (MCP)
 
-- [Core Concepts](/guide/concepts) - Understand how ContextOS works
-- [context.yaml Reference](/guide/context-yaml) - Configure your project
-- [CLI Commands](/cli/) - Explore all commands
+Just start chatting! ContextOS is already integrated:
+
+```
+You: Add rate limiting to AuthController
+
+Claude: [Uses contextos_build tool automatically]
+        Based on your AuthController.ts and RateLimitMiddleware.ts,
+        here's how to add rate limiting...
+```
+
+### With CLI Tools (Codex, Gemini)
+
+Use the context-aware wrapper:
+
+```bash
+# Use the wrapper command
+codex-ctx "Add rate limiting to AuthController"
+
+# Or manually include context
+npx @contextos/cli goal "Add rate limiting" --output context.md
+codex "Add rate limiting" --context context.md
+```
+
+## What's Next?
+
+- [Configuration Guide](/guide/configuration) - Customize context.yaml
+- [CLI Commands](/guide/cli-commands) - All available commands
+- [How It Works](/concepts/how-it-works) - Understanding the algorithm
+- [MCP Integration](/api/mcp) - Advanced MCP usage
+
+## Troubleshooting
+
+### "No index found"
+
+Run `npx @contextos/cli index` first.
+
+### "Context too large"
+
+Reduce token budget in context.yaml:
+
+```yaml
+budget:
+  maxTokens: 50000  # Reduce from default
+```
+
+### "File not included"
+
+Add important files to constraints:
+
+```yaml
+constraints:
+  alwaysInclude:
+    - src/core/**/*.ts
+```
+
+## Need Help?
+
+- [GitHub Issues](https://github.com/ixayldz/ContextOS/issues)
+- [Discussions](https://github.com/ixayldz/ContextOS/discussions)

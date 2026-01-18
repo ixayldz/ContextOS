@@ -7,6 +7,7 @@ import Database from 'better-sqlite3';
 import { existsSync, mkdirSync } from 'fs';
 import { dirname } from 'path';
 import type { CodeChunk, VectorSearchResult } from '../types.js';
+import { VECTOR_PAGE_SIZE } from '../constants.js';
 
 // Proper type definition for the embedder pipeline
 type EmbeddingPipeline = {
@@ -172,7 +173,7 @@ export class VectorStore {
     private vectorSearch(queryEmbedding: Float32Array, limit: number): VectorSearchResult[] {
         if (!this.db) throw new Error('VectorStore not initialized');
 
-        const pageSize = 1000;
+        const pageSize = VECTOR_PAGE_SIZE;
         let offset = 0;
         const allResults: VectorSearchResult[] = [];
 
@@ -229,7 +230,7 @@ export class VectorStore {
         if (!this.db) throw new Error('VectorStore not initialized');
 
         const terms = query.toLowerCase().split(/\s+/);
-        const pageSize = 1000;
+        const pageSize = VECTOR_PAGE_SIZE;
         let offset = 0;
         const allResults: VectorSearchResult[] = [];
 

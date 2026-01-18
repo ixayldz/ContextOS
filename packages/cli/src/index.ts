@@ -20,6 +20,7 @@ import { explainCommand } from './commands/explain.js';
 import { traceCommand } from './commands/trace.js';
 import { registerPluginCommand } from './commands/plugin.js';
 import { registerFinetuneCommand } from './commands/finetune.js';
+import { registerCloudCommands } from './commands/cloud.js';
 
 const program = new Command();
 
@@ -47,6 +48,8 @@ program.addCommand(traceCommand);
 // Register plugin commands
 registerPluginCommand(program);
 registerFinetuneCommand(program);
+registerCloudCommands(program);
 
 // Parse and execute
 program.parse();
+

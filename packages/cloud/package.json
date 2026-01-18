@@ -1,0 +1,33 @@
+{
+    "name": "@contextos/cloud",
+    "version": "0.1.0",
+    "description": "ContextOS Cloud MCP Server - Hosted MCP solution",
+    "type": "module",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "bin": {
+        "contextos-cloud": "./dist/server.js"
+    },
+    "scripts": {
+        "build": "tsup src/index.ts src/server.ts --format esm --clean",
+        "dev": "tsx watch src/server.ts",
+        "start": "node dist/server.js",
+        "lint": "eslint src/"
+    },
+    "dependencies": {
+        "@hono/node-server": "^1.8.0",
+        "hono": "^4.0.0",
+        "nanoid": "^5.0.0"
+    },
+    "devDependencies": {
+        "@types/node": "^20.11.0",
+        "eslint": "^8.57.0",
+        "tsup": "^8.0.2",
+        "tsx": "^4.7.0",
+        "typescript": "^5.4.0"
+    },
+    "files": [
+        "dist"
+    ],
+    "license": "MIT"
+}

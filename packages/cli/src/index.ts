@@ -18,6 +18,8 @@ import { analyzeCommand } from './commands/analyze.js';
 import { refactorCommand } from './commands/refactor.js';
 import { explainCommand } from './commands/explain.js';
 import { traceCommand } from './commands/trace.js';
+import { registerPluginCommand } from './commands/plugin.js';
+import { registerFinetuneCommand } from './commands/finetune.js';
 
 const program = new Command();
 
@@ -41,6 +43,10 @@ program.addCommand(analyzeCommand);
 program.addCommand(refactorCommand);
 program.addCommand(explainCommand);
 program.addCommand(traceCommand);
+
+// Register plugin commands
+registerPluginCommand(program);
+registerFinetuneCommand(program);
 
 // Parse and execute
 program.parse();

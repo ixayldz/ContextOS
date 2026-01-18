@@ -51,6 +51,26 @@ export * from './analytics/index.js';
 // Compliance (RBAC & Audit)
 export * from './compliance/index.js';
 
+// Plugin System
+export * from './plugins/index.js';
+
+// Fine-tuning
+export {
+    TrainingDataCollector,
+    createTrainingDataCollector,
+    DatasetFormatter,
+    createDatasetFormatter,
+    type TrainingExample,
+    type DatasetConfig,
+    type ExportFormat,
+    type FineTuningJob,
+    type DatasetStats,
+    type ValidationResult as DatasetValidationResult,
+} from './finetuning/index.js';
+
+// Deployment
+export * from './deployment/index.js';
+
 // Error Handling
 export * from './errors.js';
 

@@ -9,7 +9,7 @@
 [![npm version](https://img.shields.io/npm/v/@contextos/cli?style=flat-square)](https://www.npmjs.com/package/@contextos/cli)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.4-blue?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
-[![Tests](https://img.shields.io/badge/Tests-180%20passing-green?style=flat-square)](https://github.com/ixayldz/ContextOS)
+[![Tests](https://img.shields.io/badge/Tests-194%20passing-green?style=flat-square)](https://github.com/ixayldz/ContextOS)
 
 *"Stop paying for noise. Curate your context."*
 
@@ -96,6 +96,43 @@ MIT CSAIL'ın Recursive Language Model araştırmasına dayanır. Context'i "ver
 - GPT-5.2 / GPT-4
 - Claude 4.5 Opus
 - Yerel modeller (Ollama)
+
+</td>
+</tr>
+<tr>
+<td width="50%">
+
+### 🔌 Plugin System
+Extensible architecture with marketplace:
+- `ctx plugin install/remove`
+- Custom hooks & commands
+- Local + remote registry
+
+</td>
+<td width="50%">
+
+### 🖥️ IDE Entegrasyonları
+- VS Code Extension
+- JetBrains (IntelliJ, WebStorm)
+- Neovim (Lua + Telescope)
+
+</td>
+</tr>
+<tr>
+<td width="50%">
+
+### 🏢 Enterprise Deployment
+- Docker & Kubernetes ready
+- Helm charts included
+- SSO/LDAP support
+
+</td>
+<td width="50%">
+
+### 🎯 Model Fine-tuning
+- Training data collection
+- JSONL/OpenAI/Anthropic export
+- `ctx finetune export/validate`
 
 </td>
 </tr>
@@ -223,6 +260,17 @@ const deps = ctx.getDependencies('AuthService');
 | `ctx trace <symbol>` | Fonksiyon takibi |
 | `ctx doctor` | Konfigürasyon kontrolü |
 | `ctx suggest-rules` | Kural önerisi |
+
+### Plugin & Fine-tuning Komutları
+
+| Komut | Açıklama |
+|-------|----------|
+| `ctx plugin list` | Yüklü pluginleri listele |
+| `ctx plugin install <src>` | Plugin yükle |
+| `ctx plugin create <name>` | Yeni plugin oluştur |
+| `ctx finetune export` | Training data export |
+| `ctx finetune validate` | Dataset doğrula |
+| `ctx finetune stats` | İstatistikleri göster |
 
 ### Örnek Senaryolar
 
@@ -398,6 +446,8 @@ ContextOS/
 ├── docs/               # VitePress dokümantasyon
 ├── USAGE.md            # Türkçe kullanım kılavuzu
 └── README.md
+│   ├── jetbrains/      # JetBrains IDE Plugin (Kotlin)
+│   └── neovim/         # Neovim Plugin (Lua)
 ```
 
 ---
@@ -428,10 +478,11 @@ pnpm dev
 
 | Metrik | Değer |
 |--------|-------|
-| Tests | 180 ✅ |
-| CLI Commands | 13 |
+| Tests | 194 ✅ |
+| CLI Commands | 15 |
 | Languages | 6 |
 | Model Adapters | 3 |
+| IDE Plugins | 3 (VS Code, JetBrains, Neovim) |
 | Core Size | 174 KB |
 
 ---

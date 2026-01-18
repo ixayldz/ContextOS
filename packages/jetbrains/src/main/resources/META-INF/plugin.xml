@@ -1,0 +1,111 @@
+<idea-plugin>
+    <id>com.contextos.intellij</id>
+    <name>ContextOS</name>
+    <version>0.1.0</version>
+    <vendor email="support@contextos.dev" url="https://contextos.dev">ContextOS Team</vendor>
+
+    <description><![CDATA[
+    <h2>ContextOS - AI Context Engine for Large Codebases</h2>
+    <p>Build optimal context for AI coding assistants from your codebase.</p>
+    
+    <h3>Features:</h3>
+    <ul>
+        <li><b>Smart Context Building</b> - Automatically select relevant files for any goal</li>
+        <li><b>Hybrid Ranking</b> - Combines semantic search, dependency graphs, and rules</li>
+        <li><b>Token Budget Management</b> - Optimize for your target LLM's context window</li>
+        <li><b>RLM Analysis</b> - Deep recursive analysis powered by AI</li>
+    </ul>
+    
+    <h3>Commands:</h3>
+    <ul>
+        <li>Build Context - Generate context for a specific goal</li>
+        <li>Copy Context - Copy optimized context to clipboard</li>
+        <li>Analyze - Run RLM-powered analysis</li>
+        <li>Doctor - Check configuration health</li>
+    </ul>
+    ]]></description>
+
+    <change-notes><![CDATA[
+    <h3>0.1.0</h3>
+    <ul>
+        <li>Initial release</li>
+        <li>Context building and copying</li>
+        <li>Tool window with context preview</li>
+        <li>Settings panel for API keys and preferences</li>
+    </ul>
+    ]]></change-notes>
+
+    <idea-version since-build="233" until-build="242.*"/>
+
+    <depends>com.intellij.modules.platform</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <!-- Tool Window -->
+        <toolWindow id="ContextOS" 
+                    secondary="true" 
+                    icon="/icons/contextos.svg" 
+                    anchor="right"
+                    factoryClass="com.contextos.toolwindow.ContextOSToolWindowFactory"/>
+        
+        <!-- Settings -->
+        <applicationConfigurable 
+            parentId="tools" 
+            instance="com.contextos.settings.ContextOSSettingsConfigurable"
+            id="com.contextos.settings"
+            displayName="ContextOS"/>
+        
+        <applicationService 
+            serviceInterface="com.contextos.settings.ContextOSSettings"
+            serviceImplementation="com.contextos.settings.ContextOSSettings"/>
+        
+        <!-- Notifications -->
+        <notificationGroup id="ContextOS" 
+                          displayType="BALLOON"/>
+    </extensions>
+
+    <actions>
+        <!-- Main Action Group -->
+        <group id="ContextOS.MainGroup" 
+               text="ContextOS" 
+               description="ContextOS actions"
+               popup="true">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+            
+            <action id="ContextOS.BuildContext"
+                    class="com.contextos.actions.BuildContextAction"
+                    text="Build Context..."
+                    description="Build optimized context for a goal"
+                    icon="/icons/build.svg">
+                <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt C"/>
+            </action>
+            
+            <action id="ContextOS.CopyContext"
+                    class="com.contextos.actions.CopyContextAction"
+                    text="Copy Context"
+                    description="Copy current context to clipboard"
+                    icon="/icons/copy.svg">
+                <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt shift C"/>
+            </action>
+            
+            <separator/>
+            
+            <action id="ContextOS.Analyze"
+                    class="com.contextos.actions.AnalyzeAction"
+                    text="Analyze..."
+                    description="Run RLM-powered analysis"
+                    icon="/icons/analyze.svg"/>
+            
+            <action id="ContextOS.Doctor"
+                    class="com.contextos.actions.DoctorAction"
+                    text="Run Health Check"
+                    description="Check ContextOS configuration"
+                    icon="/icons/doctor.svg"/>
+        </group>
+        
+        <!-- Editor Context Menu -->
+        <group id="ContextOS.EditorGroup">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+            <reference ref="ContextOS.BuildContext"/>
+        </group>
+    </actions>
+</idea-plugin>

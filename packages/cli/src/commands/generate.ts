@@ -11,7 +11,7 @@ export const generateCommand = new Command('generate')
     .description('Generate code using AI')
     .argument('<prompt>', 'What to generate')
     .option('--dry-run', 'Preview what would be generated without writing files')
-    .option('--model <model>', 'AI model to use (gemini, openai)', 'auto')
+    .option('--model <model>', 'AI model to use (gemini, openai, anthropic)', 'auto')
     .option('--no-backup', 'Skip backup before overwriting files')
     .option('--max-files <n>', 'Maximum number of files to generate', '20')
     .action(async (prompt, options) => {

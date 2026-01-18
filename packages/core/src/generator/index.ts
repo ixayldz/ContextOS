@@ -1,20 +1,29 @@
 /**
  * AI Code Generator
  * Generates code from prompts using AI models
+ * Phase 8: Added depth limit, shadow FS, negative context
  */
 
 import { existsSync, mkdirSync, writeFileSync, readFileSync } from 'fs';
 import { dirname, join, resolve, normalize } from 'path';
 import { GeminiClient, createGeminiClient, isGeminiAvailable } from '../llm/gemini-client.js';
 import { OpenAIAdapter, createOpenAIAdapter, isOpenAIAvailable } from '../llm/openai-adapter.js';
+import { AnthropicAdapter, createAnthropicAdapter, isAnthropicAvailable } from '../llm/anthropic-adapter.js';
 import { loadConfig, type LoadedConfig } from '../config/loader.js';
+import { ShadowFileSystem, createShadowFS } from './shadow-fs.js';
+import { NegativeContextManager, createNegativeContextManager } from '../context/negative-context.js';
+
+// Maximum recursion depth to prevent infinite loops (Qwen Trap)
+const MAX_DEPTH = 3;
 
 export interface GeneratorOptions {
     dryRun?: boolean;
     confirm?: boolean;
-    model?: 'gemini' | 'openai' | 'auto';
+    model?: 'gemini' | 'openai' | 'anthropic' | 'auto';
     maxFiles?: number;
     backupBeforeOverwrite?: boolean;
+    depth?: number; // Current recursion depth
+    useTransaction?: boolean; // Use shadow FS for atomic writes
 }
 
 export interface GeneratedFile {
@@ -38,7 +47,10 @@ export class AIGenerator {
     private config: LoadedConfig | null = null;
     private gemini: GeminiClient | null = null;
     private openai: OpenAIAdapter | null = null;
+    private anthropic: AnthropicAdapter | null = null;
     private rootDir: string = process.cwd();
+    private shadowFS: ShadowFileSystem | null = null;
+    private negativeContext: NegativeContextManager | null = null;
 
     constructor(projectDir?: string) {
         this.rootDir = projectDir || process.cwd();
@@ -62,10 +74,17 @@ export class AIGenerator {
         if (isOpenAIAvailable()) {
             this.openai = createOpenAIAdapter();
         }
-
-        if (!this.gemini && !this.openai) {
-            throw new Error('No AI API key found. Set GEMINI_API_KEY or OPENAI_API_KEY environment variable.');
+        if (isAnthropicAvailable()) {
+            this.anthropic = createAnthropicAdapter();
         }
+
+        if (!this.gemini && !this.openai && !this.anthropic) {
+            throw new Error('No AI API key found. Set GEMINI_API_KEY, OPENAI_API_KEY, or ANTHROPIC_API_KEY environment variable.');
+        }
+
+        // Initialize Shadow FS and Negative Context
+        this.shadowFS = createShadowFS(this.rootDir);
+        this.negativeContext = createNegativeContextManager(this.rootDir);
     }
 
     /**
@@ -73,12 +92,24 @@ export class AIGenerator {
      */
     async generate(prompt: string, options: GeneratorOptions = {}): Promise<GenerateResult> {
         const model = options.model || 'auto';
-        
-        // Build context
+        const depth = options.depth || 0;
+
+        // Check depth limit (prevent infinite recursion - Qwen Trap)
+        if (depth >= MAX_DEPTH) {
+            return {
+                success: false,
+                files: [],
+                tokensUsed: 0,
+                error: `Maximum recursion depth (${MAX_DEPTH}) exceeded. Provide a heuristic summary instead.`,
+            };
+        }
+
+        // Build context with negative rules
         const context = await this.buildContext();
-        
-        // Create the full prompt
-        const fullPrompt = this.createPrompt(prompt, context);
+        const negativeRules = this.negativeContext?.generatePromptInjection() || '';
+
+        // Create the full prompt with negative context
+        const fullPrompt = this.createPrompt(prompt, context + negativeRules);
 
         // Call AI
         let response: string;
@@ -96,6 +127,16 @@ export class AIGenerator {
                     systemPrompt: 'You are an expert software developer. Generate clean, production-ready code.',
                     userMessage: fullPrompt,
                     maxTokens: 8000,
+                });
+                response = result.content;
+                tokensUsed = result.tokensUsed.total;
+            } else if (model === 'anthropic' || (model === 'auto' && this.anthropic)) {
+                if (!this.anthropic) throw new Error('Anthropic not available');
+                const result = await this.anthropic.complete({
+                    systemPrompt: 'You are an expert software developer. Generate clean, production-ready code.',
+                    userMessage: fullPrompt,
+                    maxTokens: 8000,
+                    model: 'claude-3-5-sonnet-20240620' // Default to 3.5 Sonnet
                 });
                 response = result.content;
                 tokensUsed = result.tokensUsed.total;
@@ -212,11 +253,11 @@ Generate the files now:`;
      */
     private parseResponse(response: string): GeneratedFile[] {
         const files: GeneratedFile[] = [];
-        
+
         // Match code blocks with path in language tag
         // Pattern: ```path/to/file.ext\n...content...\n```
         const codeBlockRegex = /```([^\n`]+)\n([\s\S]*?)```/g;
-        
+
         let match;
         while ((match = codeBlockRegex.exec(response)) !== null) {
             const pathOrLang = match[1].trim();
@@ -226,7 +267,7 @@ Generate the files now:`;
             if (pathOrLang.includes('/') || pathOrLang.includes('\\') || /\.\w+$/.test(pathOrLang)) {
                 // Normalize path
                 const filePath = pathOrLang.replace(/\\/g, '/');
-                
+
                 // Detect language from extension
                 const ext = filePath.split('.').pop() || '';
                 const language = this.getLanguageFromExtension(ext);
@@ -281,7 +322,7 @@ Generate the files now:`;
 
         for (const file of files) {
             const fullPath = resolve(this.rootDir, file.path);
-            
+
             // Security: ensure path is within project root
             const normalizedPath = normalize(fullPath);
             if (!normalizedPath.startsWith(normalize(this.rootDir))) {

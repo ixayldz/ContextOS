@@ -79,7 +79,12 @@ export * from './logger.js';
 
 // AI Generator
 export * from './generator/index.js';
+export * from './generator/shadow-fs.js';
+
+// Negative Context
+export * from './context/negative-context.js';
 
 // Types
 export * from './types.js';
+
 

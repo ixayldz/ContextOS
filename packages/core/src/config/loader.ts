@@ -50,7 +50,7 @@ export function loadContextYaml(rootDir: string): ContextYamlOutput {
     const contextPath = join(rootDir, CONTEXTOS_DIR, CONTEXT_FILE);
 
     if (!existsSync(contextPath)) {
-        throw new Error(`context.yaml not found at ${contextPath}. Run 'ctx init' first.`);
+        throw new Error(`ContextOS not initialized: context.yaml not found at ${contextPath}. Run 'ctx init' first.`);
     }
 
     const rawContent = readFileSync(contextPath, 'utf-8');
@@ -262,7 +262,7 @@ export function saveConfigYaml(
 export function isInitialized(startDir: string = process.cwd()): boolean {
     const rootDir = findContextosRoot(startDir);
     if (!rootDir) return false;
-    
+
     // Also check that context.yaml exists
     const contextPath = join(rootDir, CONTEXTOS_DIR, CONTEXT_FILE);
     return existsSync(contextPath);

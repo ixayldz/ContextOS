@@ -71,7 +71,13 @@ export const generateCommand = new Command('generate')
 
         } catch (error) {
             spinner.fail('Generation failed');
-            console.error(chalk.red('\nError:'), error instanceof Error ? error.message : error);
+            if (error instanceof Error && error.message.includes('ContextOS not initialized')) {
+                console.log(chalk.red('\n❌ Environment not initialized.'));
+                console.log(chalk.yellow(`   ${error.message}`));
+                console.log(chalk.green('\n   👉 Run "ctx init" to set up your project.\n'));
+            } else {
+                console.error(chalk.red('\nError:'), error instanceof Error ? error.message : String(error));
+            }
             process.exit(1);
         }
     });
@@ -129,7 +135,13 @@ export const fixCommand = new Command('fix')
 
         } catch (error) {
             spinner.fail('Fix failed');
-            console.error(chalk.red('\nError:'), error instanceof Error ? error.message : error);
+            if (error instanceof Error && error.message.includes('ContextOS not initialized')) {
+                console.log(chalk.red('\n❌ Environment not initialized.'));
+                console.log(chalk.yellow(`   ${error.message}`));
+                console.log(chalk.green('\n   👉 Run "ctx init" to set up your project.\n'));
+            } else {
+                console.error(chalk.red('\nError:'), error instanceof Error ? error.message : String(error));
+            }
             process.exit(1);
         }
     });

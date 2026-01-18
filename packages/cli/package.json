@@ -1,6 +1,6 @@
 {
     "name": "@contextos/cli",
-    "version": "0.4.2",
+    "version": "0.4.3",
     "description": "CLI for ContextOS - The Context Server Protocol for AI Coding",
     "type": "module",
     "bin": {

@@ -65,10 +65,12 @@ export const indexCommand = new Command('index')
 
         } catch (error) {
             spinner.fail('Indexing failed');
-            if (error instanceof Error && error.message.includes('not initialized')) {
-                console.log(chalk.yellow('\nRun "ctx init" first to initialize ContextOS.\n'));
+            if (error instanceof Error && error.message.includes('ContextOS not initialized')) {
+                console.log(chalk.red('\n❌ Environment not initialized.'));
+                console.log(chalk.yellow(`   ${error.message}`));
+                console.log(chalk.green('\n   👉 Run "ctx init" to set up your project.\n'));
             } else {
-                console.error(chalk.red('Error:'), error);
+                console.error(chalk.red('Error:'), error instanceof Error ? error.message : String(error));
             }
             process.exit(1);
         }

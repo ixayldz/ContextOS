@@ -257,7 +257,14 @@ export function saveConfigYaml(
 
 /**
  * Check if ContextOS is initialized in the given directory
+ * Fixed: Also checks if context.yaml exists, not just .contextos folder
  */
 export function isInitialized(startDir: string = process.cwd()): boolean {
-    return findContextosRoot(startDir) !== null;
+    const rootDir = findContextosRoot(startDir);
+    if (!rootDir) return false;
+    
+    // Also check that context.yaml exists
+    const contextPath = join(rootDir, CONTEXTOS_DIR, CONTEXT_FILE);
+    return existsSync(contextPath);
 }
+

@@ -1,6 +1,6 @@
 {
     "name": "@contextos/setup",
-    "version": "0.2.0",
+    "version": "0.2.1",
     "description": "Universal setup for ContextOS - one command to configure all AI coding tools (Claude, Cursor, Codex, Gemini, Windsurf, VS Code, Kilo Code, Warp)",
     "type": "module",
     "bin": {

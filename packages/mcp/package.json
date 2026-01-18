@@ -1,6 +1,6 @@
 {
     "name": "@contextos/mcp",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "description": "Model Context Protocol server for ContextOS - enables AI tools to access optimized context",
     "type": "module",
     "main": "dist/index.js",

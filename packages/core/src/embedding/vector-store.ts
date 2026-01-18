@@ -8,13 +8,20 @@ import { existsSync, mkdirSync } from 'fs';
 import { dirname } from 'path';
 import type { CodeChunk, VectorSearchResult } from '../types.js';
 
+// Proper type definition for the embedder pipeline
+type EmbeddingPipeline = {
+    (text: string | string[], options?: { pooling?: string; normalize?: boolean }): Promise<{
+        data: number[] | number[][];
+        dimensions: number[];
+    }>;
+};
+
 // Note: In production, we'd use @xenova/transformers for embeddings
 // For now, this is a placeholder that can work without the ML library
 
 export class VectorStore {
     private db: Database.Database | null = null;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    private embedder: any = null;
+    private embedder: EmbeddingPipeline | null = null;
     private dbPath: string;
 
     constructor(dbPath: string) {
@@ -61,6 +68,7 @@ export class VectorStore {
 
     /**
      * Initialize the embedding model
+     * Fixed: Better error handling for dynamic import failures
      */
     private async initializeEmbedder(): Promise<void> {
         try {
@@ -68,7 +76,9 @@ export class VectorStore {
             const { pipeline } = await import('@xenova/transformers');
             this.embedder = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
         } catch (error) {
-            console.warn('Warning: Embedding model not available. Using fallback similarity.');
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            console.warn(`Failed to initialize embedding model: ${errorMessage}`);
+            console.warn('Vector search will use text-based fallback (less accurate).');
             this.embedder = null;
         }
     }
@@ -157,86 +167,117 @@ export class VectorStore {
 
     /**
      * Vector-based similarity search
+     * Fixed: Uses pagination to prevent unbounded memory growth
      */
     private vectorSearch(queryEmbedding: Float32Array, limit: number): VectorSearchResult[] {
         if (!this.db) throw new Error('VectorStore not initialized');
 
-        // Get all chunks with embeddings
-        const chunks = this.db.prepare(`
-      SELECT id, file_path, content, start_line, end_line, embedding
-      FROM chunks
-      WHERE embedding IS NOT NULL
-    `).all() as Array<{
-            id: string;
-            file_path: string;
-            content: string;
-            start_line: number;
-            end_line: number;
-            embedding: Buffer;
-        }>;
+        const pageSize = 1000;
+        let offset = 0;
+        const allResults: VectorSearchResult[] = [];
 
-        // Calculate cosine similarity for each chunk
-        const results: VectorSearchResult[] = chunks.map(chunk => {
-            const chunkEmbedding = new Float32Array(chunk.embedding.buffer);
-            const score = cosineSimilarity(queryEmbedding, chunkEmbedding);
+        // Paginated loading to avoid loading all embeddings at once
+        while (allResults.length < limit * 2) { // Fetch 2x to ensure we get good matches
+            const chunks = this.db.prepare(`
+                SELECT id, file_path, content, start_line, end_line, embedding
+                FROM chunks
+                WHERE embedding IS NOT NULL
+                LIMIT ? OFFSET ?
+            `).all(pageSize, offset) as Array<{
+                id: string;
+                file_path: string;
+                content: string;
+                start_line: number;
+                end_line: number;
+                embedding: Buffer;
+            }>;
 
-            return {
-                chunkId: chunk.id,
-                filePath: chunk.file_path,
-                content: chunk.content,
-                score,
-                lines: [chunk.start_line, chunk.end_line] as [number, number],
-            };
-        });
+            if (chunks.length === 0) break;
+
+            // Calculate similarity for this batch
+            const batchResults: VectorSearchResult[] = chunks.map(chunk => {
+                const chunkEmbedding = new Float32Array(chunk.embedding.buffer);
+                const score = cosineSimilarity(queryEmbedding, chunkEmbedding);
+
+                return {
+                    chunkId: chunk.id,
+                    filePath: chunk.file_path,
+                    content: chunk.content,
+                    score,
+                    lines: [chunk.start_line, chunk.end_line] as [number, number],
+                };
+            });
+
+            allResults.push(...batchResults);
+            offset += pageSize;
+
+            // Early exit if we've processed all chunks
+            if (chunks.length < pageSize) break;
+        }
 
         // Sort by score and return top results
-        return results
+        return allResults
             .sort((a, b) => b.score - a.score)
             .slice(0, limit);
     }
 
     /**
      * Text-based fallback search
+     * Fixed: Uses pagination to prevent unbounded memory growth
      */
     private textSearch(query: string, limit: number): VectorSearchResult[] {
         if (!this.db) throw new Error('VectorStore not initialized');
 
         const terms = query.toLowerCase().split(/\s+/);
+        const pageSize = 1000;
+        let offset = 0;
+        const allResults: VectorSearchResult[] = [];
 
-        // Simple text matching
-        const chunks = this.db.prepare(`
-      SELECT id, file_path, content, start_line, end_line
-      FROM chunks
-    `).all() as Array<{
-            id: string;
-            file_path: string;
-            content: string;
-            start_line: number;
-            end_line: number;
-        }>;
+        // Paginated loading
+        while (allResults.length < limit * 2) {
+            const chunks = this.db.prepare(`
+                SELECT id, file_path, content, start_line, end_line
+                FROM chunks
+                LIMIT ? OFFSET ?
+            `).all(pageSize, offset) as Array<{
+                id: string;
+                file_path: string;
+                content: string;
+                start_line: number;
+                end_line: number;
+            }>;
 
-        const results: VectorSearchResult[] = chunks.map(chunk => {
-            const contentLower = chunk.content.toLowerCase();
-            let score = 0;
+            if (chunks.length === 0) break;
 
-            for (const term of terms) {
-                const matches = (contentLower.match(new RegExp(term, 'g')) || []).length;
-                score += matches;
-            }
+            // Calculate scores for this batch
+            const batchResults: VectorSearchResult[] = chunks.map(chunk => {
+                const contentLower = chunk.content.toLowerCase();
+                let score = 0;
 
-            // Normalize score
-            score = Math.min(1, score / (terms.length * 2));
+                for (const term of terms) {
+                    const matches = (contentLower.match(new RegExp(term, 'g')) || []).length;
+                    score += matches;
+                }
 
-            return {
-                chunkId: chunk.id,
-                filePath: chunk.file_path,
-                content: chunk.content,
-                score,
-                lines: [chunk.start_line, chunk.end_line] as [number, number],
-            };
-        });
+                // Normalize score
+                score = Math.min(1, score / (terms.length * 2));
 
-        return results
+                return {
+                    chunkId: chunk.id,
+                    filePath: chunk.file_path,
+                    content: chunk.content,
+                    score,
+                    lines: [chunk.start_line, chunk.end_line] as [number, number],
+                };
+            });
+
+            allResults.push(...batchResults);
+            offset += pageSize;
+
+            if (chunks.length < pageSize) break;
+        }
+
+        return allResults
             .filter(r => r.score > 0)
             .sort((a, b) => b.score - a.score)
             .slice(0, limit);
@@ -308,6 +349,65 @@ export class VectorStore {
             chunkCount: stats.chunk_count,
             fileCount: stats.file_count,
             embeddedCount: stats.embedded_count,
+        };
+    }
+
+    /**
+     * Get paginated chunks
+     * Fixed: Added pagination to prevent loading all chunks at once
+     */
+    getChunksPaginated(
+        page: number = 0,
+        pageSize: number = 100
+    ): {
+        chunks: CodeChunk[];
+        total: number;
+        page: number;
+        pageSize: number;
+        totalPages: number;
+        hasMore: boolean;
+    } {
+        if (!this.db) throw new Error('VectorStore not initialized');
+
+        // Get total count
+        const totalResult = this.db.prepare('SELECT COUNT(*) as count FROM chunks').get() as { count: number };
+        const total = totalResult.count;
+
+        // Get paginated results
+        const rows = this.db.prepare(`
+            SELECT id, file_path, content, start_line, end_line, hash, type
+            FROM chunks
+            ORDER BY file_path, start_line
+            LIMIT ? OFFSET ?
+        `).all(pageSize, page * pageSize) as Array<{
+            id: string;
+            file_path: string;
+            content: string;
+            start_line: number;
+            end_line: number;
+            hash: string;
+            type: string;
+        }>;
+
+        const chunks = rows.map(row => ({
+            id: row.id,
+            filePath: row.file_path,
+            content: row.content,
+            startLine: row.start_line,
+            endLine: row.end_line,
+            hash: row.hash,
+            type: row.type as CodeChunk['type'],
+        }));
+
+        const totalPages = Math.ceil(total / pageSize);
+
+        return {
+            chunks,
+            total,
+            page,
+            pageSize,
+            totalPages,
+            hasMore: (page * pageSize) + chunks.length < total,
         };
     }
 

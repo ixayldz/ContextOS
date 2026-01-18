@@ -406,12 +406,17 @@ ${result.context}
             /^from\s+([\w.]+)\s+import/gm,
         ];
 
+        // Fix R3: Add maximum iterations to prevent ReDoS
+        const MAX_ITERATIONS = 1000;
+
         for (const pattern of patterns) {
             let match;
-            while ((match = pattern.exec(content)) !== null) {
+            let iterations = 0;
+            while ((match = pattern.exec(content)) !== null && iterations < MAX_ITERATIONS) {
                 if (match[1] && !imports.includes(match[1])) {
                     imports.push(match[1]);
                 }
+                iterations++;
             }
         }
 

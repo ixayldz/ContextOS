@@ -15,10 +15,30 @@ const app = new Hono();
 
 // Middleware
 app.use('*', logger());
+
+// CORS configuration with origin validation (Fix R4: CORS Misconfiguration)
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '').split(',').filter(Boolean);
 app.use('*', cors({
-    origin: '*',
+    origin: (origin) => {
+        // Allow requests with no origin (mobile apps, curl, etc.)
+        if (!origin) return true;
+
+        // Development mode: allow all origins
+        if (process.env.NODE_ENV === 'development') {
+            return true;
+        }
+
+        // Production mode: only allow whitelisted origins
+        if (ALLOWED_ORIGINS.length === 0) {
+            console.warn('⚠️  CORS: No ALLOWED_ORIGINS configured in production');
+            return false;
+        }
+
+        return ALLOWED_ORIGINS.includes(origin);
+    },
     allowMethods: ['GET', 'POST', 'OPTIONS'],
     allowHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
+    credentials: true,
 }));
 
 // Health check

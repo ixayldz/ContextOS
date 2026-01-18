@@ -1,7 +1,10 @@
 /**
  * Gemini Pro API Client
  * Provides LLM-powered context summarization and intelligent features
+ * Fixed: Added rate limiting to prevent API quota exhaustion
  */
+
+import { RateLimiter, getDefaultRateLimit } from './rate-limiter.js';
 
 export interface GeminiConfig {
     apiKey: string;
@@ -41,6 +44,7 @@ export class GeminiClient {
     private maxOutputTokens: number;
     private temperature: number;
     private thinkingLevel: ThinkingLevel;
+    private rateLimiter: RateLimiter;
 
     constructor(config: GeminiConfig) {
         this.apiKey = config.apiKey;
@@ -49,6 +53,10 @@ export class GeminiClient {
         // Gemini 3 recommends temperature 1.0 for optimal reasoning
         this.temperature = 1.0;
         this.thinkingLevel = 'high'; // Default to high for best reasoning
+
+        // Initialize rate limiter with Gemini default limits
+        const rateLimit = getDefaultRateLimit('gemini', this.model);
+        this.rateLimiter = new RateLimiter({ requestsPerMinute: rateLimit });
     }
 
     /**
@@ -60,11 +68,15 @@ export class GeminiClient {
 
     /**
      * Make a request to Gemini API
+     * Fixed: Added rate limiting and retry logic for 429 responses
      */
-    private async request(prompt: string, systemPrompt?: string): Promise<string> {
+    private async request(prompt: string, systemPrompt?: string, retryCount: number = 0): Promise<string> {
         if (!this.apiKey) {
             throw new Error('Gemini API key not configured. Set GEMINI_API_KEY environment variable.');
         }
+
+        // Wait for rate limiter slot
+        await this.rateLimiter.waitForSlot();
 
         const url = `${GEMINI_API_URL}/${this.model}:generateContent?key=${this.apiKey}`;
 
@@ -103,6 +115,20 @@ export class GeminiClient {
                 },
             }),
         });
+
+        // Handle rate limiting (429)
+        if (response.status === 429) {
+            const retryAfter = response.headers.get('Retry-After');
+            const waitTime = retryAfter ? parseInt(retryAfter) * 1000 : 60000; // Default 1 minute
+
+            if (retryCount < 3) {
+                console.warn(`Rate limited. Waiting ${waitTime}ms before retry (${retryCount + 1}/3)...`);
+                await new Promise(resolve => setTimeout(resolve, waitTime));
+                return this.request(prompt, systemPrompt, retryCount + 1);
+            }
+
+            throw new Error(`Rate limit exceeded after ${retryCount} retries. Please try again later.`);
+        }
 
         if (!response.ok) {
             const error = await response.text();

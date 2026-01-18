@@ -61,7 +61,7 @@ export class RLMEngine {
         const state: RLMState = {
             depth,
             consumedTokens: 0,
-            visitedPaths: new Set(),
+            visitedPaths: new Map<string, number>(), // Changed to Map with timestamps for memory leak fix
             executionLog: [],
             iteration: 0,
             startTime,
@@ -204,9 +204,12 @@ export class RLMEngine {
 
                 state.executionLog.push(entry);
 
-                // Record visited path for loop detection
+                // Record visited path for loop detection (fixed: Map with timestamps)
                 const pathKey = action.code.slice(0, 100);
-                if (state.visitedPaths.has(pathKey)) {
+                const now = Date.now();
+                const lastSeen = state.visitedPaths.get(pathKey);
+
+                if (lastSeen !== undefined) {
                     // Potential loop detected - force answer
                     messages.push({ role: 'assistant', content: response.content });
                     messages.push({
@@ -215,7 +218,18 @@ export class RLMEngine {
                     });
                     continue;
                 }
-                state.visitedPaths.add(pathKey);
+
+                state.visitedPaths.set(pathKey, now);
+
+                // Cleanup: keep only last 50 entries to prevent memory leak
+                if (state.visitedPaths.size > 50) {
+                    const entries = Array.from(state.visitedPaths.entries());
+                    entries.sort((a, b) => a[1] - b[1]); // Sort by timestamp (oldest first)
+                    // Remove oldest 10 entries
+                    for (let i = 0; i < 10; i++) {
+                        state.visitedPaths.delete(entries[i][0]);
+                    }
+                }
 
                 // Add observation to conversation
                 messages.push({ role: 'assistant', content: response.content });

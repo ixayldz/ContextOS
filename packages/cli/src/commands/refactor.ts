@@ -150,7 +150,17 @@ Respond in JSON format:
             try {
                 const jsonMatch = result.answer.match(/\{[\s\S]*\}/);
                 if (jsonMatch) {
-                    plan = JSON.parse(jsonMatch[0]);
+                    // Fix N8: JSON.parse without try-catch
+                    try {
+                        plan = JSON.parse(jsonMatch[0]);
+                    } catch (parseError) {
+                        spinner.warn('Failed to parse refactoring plan JSON');
+                        console.log();
+                        console.log(chalk.blue.bold('Analysis Result:'));
+                        console.log(result.answer);
+                        console.log();
+                        process.exit(0);
+                    }
                 } else {
                     throw new Error('No JSON found in response');
                 }

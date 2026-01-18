@@ -58,8 +58,8 @@ export interface RLMState {
     /** Tokens consumed so far */
     consumedTokens: number;
 
-    /** Visited paths for loop prevention */
-    visitedPaths: Set<string>;
+    /** Visited paths for loop prevention (path -> timestamp for memory leak fix) */
+    visitedPaths: Map<string, number>;
 
     /** Execution log for debugging and audit */
     executionLog: ExecutionEntry[];

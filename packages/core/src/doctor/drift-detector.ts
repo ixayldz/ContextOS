@@ -4,6 +4,7 @@
  */
 
 import { readFileSync, existsSync } from 'fs';
+import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { glob } from 'glob';
 import type {
@@ -233,6 +234,7 @@ export class DriftDetector {
 
     /**
      * Check a specific constraint
+     * Fix N9: Convert to async file operations
      */
     private async checkConstraint(rule: string): Promise<{ file: string; line?: number }[]> {
         const violations: { file: string; line?: number }[] = [];
@@ -242,15 +244,19 @@ export class DriftDetector {
             // Check for DB imports in controller files
             for (const file of this.sourceFiles) {
                 if (file.includes('controller')) {
-                    const content = readFileSync(file, 'utf-8');
-                    if (/import.*from.*(prisma|typeorm|sequelize|mongoose)/i.test(content)) {
-                        const lines = content.split('\n');
-                        for (let i = 0; i < lines.length; i++) {
-                            if (/import.*from.*(prisma|typeorm|sequelize|mongoose)/i.test(lines[i])) {
-                                violations.push({ file, line: i + 1 });
-                                break;
+                    try {
+                        const content = await readFile(file, 'utf-8');
+                        if (/import.*from.*(prisma|typeorm|sequelize|mongoose)/i.test(content)) {
+                            const lines = content.split('\n');
+                            for (let i = 0; i < lines.length; i++) {
+                                if (/import.*from.*(prisma|typeorm|sequelize|mongoose)/i.test(lines[i])) {
+                                    violations.push({ file, line: i + 1 });
+                                    break;
+                                }
                             }
                         }
+                    } catch {
+                        // Skip unreadable files
                     }
                 }
             }
@@ -258,12 +264,16 @@ export class DriftDetector {
 
         if (rule.toLowerCase().includes('no console.log')) {
             for (const file of this.sourceFiles) {
-                const content = readFileSync(file, 'utf-8');
-                const lines = content.split('\n');
-                for (let i = 0; i < lines.length; i++) {
-                    if (/console\.log\(/.test(lines[i]) && !lines[i].includes('//')) {
-                        violations.push({ file, line: i + 1 });
+                try {
+                    const content = await readFile(file, 'utf-8');
+                    const lines = content.split('\n');
+                    for (let i = 0; i < lines.length; i++) {
+                        if (/console\.log\(/.test(lines[i]) && !lines[i].includes('//')) {
+                            violations.push({ file, line: i + 1 });
+                        }
                     }
+                } catch {
+                    // Skip unreadable files
                 }
             }
         }
@@ -292,13 +302,14 @@ export class DriftDetector {
 
     /**
      * Find patterns in files
+     * Fix N9: Convert to async file operations
      */
     private async findPatternInFiles(patterns: RegExp[]): Promise<{ file: string; line?: number }[]> {
         const results: { file: string; line?: number }[] = [];
 
         for (const file of this.sourceFiles) {
             try {
-                const content = readFileSync(file, 'utf-8');
+                const content = await readFile(file, 'utf-8');
                 const lines = content.split('\n');
 
                 for (let i = 0; i < lines.length; i++) {

@@ -1,11 +1,16 @@
 /**
  * Cloud Sync Module
  * End-to-end encrypted cloud synchronization
+ * Fix R9: Convert synchronous file operations to async
  */
 
 import crypto from 'crypto';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
+
+// Node.js 16+ has native AbortController, for older versions use abort-controller polyfill
+const { AbortController } = globalThis as typeof globalThis & { AbortController: typeof AbortController };
 
 export interface CloudConfig {
     enabled: boolean;
@@ -129,9 +134,9 @@ export class CloudSync {
         this.config.encryptionKey = key;
         this.config.enabled = true;
 
-        // Store salt locally (key is never stored)
+        // Store salt locally (key is never stored) - Fix R9: Use async writeFile
         const saltPath = join(this.rootDir, '.contextos', '.salt');
-        writeFileSync(saltPath, salt, 'utf-8');
+        await writeFile(saltPath, salt, 'utf-8');
 
         return key;
     }
@@ -145,13 +150,16 @@ export class CloudSync {
         }
 
         try {
-            // Read .contextos folder content
+            // Read .contextos folder content - Fix R9: Use async readFile
             const contextPath = join(this.rootDir, '.contextos', 'context.yaml');
             const configPath = join(this.rootDir, '.contextos', 'config.yaml');
 
+            const contextContent = existsSync(contextPath) ? await readFile(contextPath, 'utf-8') : '';
+            const configContent = existsSync(configPath) ? await readFile(configPath, 'utf-8') : '';
+
             const data = JSON.stringify({
-                context: existsSync(contextPath) ? readFileSync(contextPath, 'utf-8') : '',
-                config: existsSync(configPath) ? readFileSync(configPath, 'utf-8') : '',
+                context: contextContent,
+                config: configContent,
                 timestamp: new Date().toISOString(),
             });
 
@@ -167,23 +175,38 @@ export class CloudSync {
                 checksum,
             };
 
-            // Upload to cloud API
-            const response = await fetch(`${this.config.apiEndpoint}/sync/upload`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
-            });
+            // Fix N7: Add timeout to prevent indefinite hangs
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
-            if (!response.ok) {
-                throw new Error(`Upload failed: ${response.status}`);
+            try {
+                // Upload to cloud API
+                const response = await fetch(`${this.config.apiEndpoint}/sync/upload`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                    signal: controller.signal,
+                });
+
+                clearTimeout(timeoutId);
+
+                if (!response.ok) {
+                    throw new Error(`Upload failed: ${response.status}`);
+                }
+
+                return {
+                    success: true,
+                    action: 'upload',
+                    message: 'Context uploaded and encrypted',
+                    timestamp: payload.timestamp,
+                };
+            } catch (fetchError) {
+                clearTimeout(timeoutId);
+                if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+                    return { success: false, action: 'upload', message: 'Upload timed out after 30 seconds' };
+                }
+                throw fetchError;
             }
-
-            return {
-                success: true,
-                action: 'upload',
-                message: 'Context uploaded and encrypted',
-                timestamp: payload.timestamp,
-            };
         } catch (error) {
             return {
                 success: false,
@@ -202,41 +225,55 @@ export class CloudSync {
         }
 
         try {
-            // Download from cloud API
-            const response = await fetch(
-                `${this.config.apiEndpoint}/sync/download?teamId=${this.config.teamId}&userId=${this.config.userId}`,
-                { method: 'GET' }
-            );
+            // Fix N7: Add timeout to prevent indefinite hangs
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
-            if (!response.ok) {
-                throw new Error(`Download failed: ${response.status}`);
+            try {
+                // Download from cloud API
+                const response = await fetch(
+                    `${this.config.apiEndpoint}/sync/download?teamId=${this.config.teamId}&userId=${this.config.userId}`,
+                    { method: 'GET', signal: controller.signal }
+                );
+
+                clearTimeout(timeoutId);
+
+                if (!response.ok) {
+                    throw new Error(`Download failed: ${response.status}`);
+                }
+
+                const payload = await response.json() as SyncPayload;
+
+                // Decrypt data
+                const decryptedData = this.encryption.decrypt(payload.data, this.config.encryptionKey);
+                const data = JSON.parse(decryptedData);
+
+                // Verify checksum
+                const expectedChecksum = this.encryption.checksum(decryptedData);
+                if (expectedChecksum !== payload.checksum) {
+                    return { success: false, action: 'download', message: 'Checksum mismatch - data corrupted' };
+                }
+
+                // Write to local files - Fix R9: Use async writeFile
+                const contextPath = join(this.rootDir, '.contextos', 'context.yaml');
+                const configPath = join(this.rootDir, '.contextos', 'config.yaml');
+
+                if (data.context) await writeFile(contextPath, data.context, 'utf-8');
+                if (data.config) await writeFile(configPath, data.config, 'utf-8');
+
+                return {
+                    success: true,
+                    action: 'download',
+                    message: 'Context downloaded and decrypted',
+                    timestamp: payload.timestamp,
+                };
+            } catch (fetchError) {
+                clearTimeout(timeoutId);
+                if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+                    return { success: false, action: 'download', message: 'Download timed out after 30 seconds' };
+                }
+                throw fetchError;
             }
-
-            const payload = await response.json() as SyncPayload;
-
-            // Decrypt data
-            const decryptedData = this.encryption.decrypt(payload.data, this.config.encryptionKey);
-            const data = JSON.parse(decryptedData);
-
-            // Verify checksum
-            const expectedChecksum = this.encryption.checksum(decryptedData);
-            if (expectedChecksum !== payload.checksum) {
-                return { success: false, action: 'download', message: 'Checksum mismatch - data corrupted' };
-            }
-
-            // Write to local files
-            const contextPath = join(this.rootDir, '.contextos', 'context.yaml');
-            const configPath = join(this.rootDir, '.contextos', 'config.yaml');
-
-            if (data.context) writeFileSync(contextPath, data.context, 'utf-8');
-            if (data.config) writeFileSync(configPath, data.config, 'utf-8');
-
-            return {
-                success: true,
-                action: 'download',
-                message: 'Context downloaded and decrypted',
-                timestamp: payload.timestamp,
-            };
         } catch (error) {
             return {
                 success: false,
@@ -247,13 +284,13 @@ export class CloudSync {
     }
 
     /**
-     * Check if encryption key is valid
+     * Check if encryption key is valid - Fix R9: Use async readFile
      */
-    validateKey(password: string): boolean {
+    async validateKey(password: string): Promise<boolean> {
         const saltPath = join(this.rootDir, '.contextos', '.salt');
         if (!existsSync(saltPath)) return false;
 
-        const salt = readFileSync(saltPath, 'utf-8');
+        const salt = await readFile(saltPath, 'utf-8');
         const derivedKey = this.encryption.deriveKey(password, salt);
 
         return derivedKey === this.config.encryptionKey;

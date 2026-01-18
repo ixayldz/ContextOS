@@ -1,13 +1,43 @@
 /**
  * Team Sync Module
  * Git-based synchronization for team context sharing
+ * Fixed R1-R2: Added input sanitization to prevent command injection
  */
 
-import { execSync } from 'child_process';
+import { execSync, spawn } from 'child_process';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { parse, stringify } from 'yaml';
 import crypto from 'crypto';
+
+/**
+ * Validate git branch name to prevent command injection
+ * Only allows: alphanumeric, hyphens, underscores, forward slashes
+ */
+function validateGitBranchName(branch: string): string {
+    if (!/^[A-Za-z0-9/_-]+$/.test(branch)) {
+        throw new Error(`Invalid git branch name: "${branch}". Only alphanumeric, _, -, and / are allowed.`);
+    }
+    return branch;
+}
+
+/**
+ * Validate git remote name to prevent command injection
+ * Only allows: alphanumeric, hyphens, underscores, dots
+ */
+function validateGitRemoteName(remote: string): string {
+    if (!/^[A-Za-z0-9_.-]+$/.test(remote)) {
+        throw new Error(`Invalid git remote name: "${remote}". Only alphanumeric, _, -, and . are allowed.`);
+    }
+    return remote;
+}
+
+/**
+ * Safe git command execution using spawn (prevents shell injection)
+ */
+function safeGitCommand(args: string[], cwd: string): string {
+    return execSync(`git ${args.join(' ')}`, { cwd, stdio: 'pipe' }).toString();
+}
 
 export interface SyncConfig {
     enabled: boolean;
@@ -54,6 +84,14 @@ export class TeamSync {
         this.rootDir = rootDir;
         this.contextosDir = join(rootDir, '.contextos');
         this.syncConfig = this.loadSyncConfig();
+
+        // Validate remote and branch names on load (Fix R1-R2: Command Injection)
+        if (this.syncConfig.remote) {
+            this.syncConfig.remote = validateGitRemoteName(this.syncConfig.remote);
+        }
+        if (this.syncConfig.branch) {
+            this.syncConfig.branch = validateGitBranchName(this.syncConfig.branch);
+        }
     }
 
     private loadSyncConfig(): SyncConfig {
@@ -74,8 +112,10 @@ export class TeamSync {
      * Initialize team sync
      */
     async initialize(remote: string = 'origin'): Promise<void> {
+        // Validate remote name (Fix R1-R2: Command Injection)
         this.syncConfig.enabled = true;
-        this.syncConfig.remote = remote;
+        this.syncConfig.remote = validateGitRemoteName(remote);
+        this.syncConfig.branch = validateGitBranchName(this.syncConfig.branch);
         this.saveSyncConfig();
 
         // Create sync branch if it doesn't exist

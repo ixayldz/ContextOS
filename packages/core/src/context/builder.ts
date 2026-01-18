@@ -1,10 +1,12 @@
 /**
  * Context Builder
  * Orchestrates all modules to build the final LLM context
+ * Fix R10: Convert synchronous file operations to async
  */
 
 import { readFileSync, existsSync } from 'fs';
-import { join, relative } from 'path';
+import { readFile, writeFile, mkdir } from 'fs/promises';
+import { join, relative, normalize } from 'path';
 import { glob } from 'glob';
 import { stringify } from 'yaml';
 import type {
@@ -40,6 +42,47 @@ export class ContextBuilder {
     }
 
     /**
+     * Sanitize git directory path to prevent command injection
+     */
+    private sanitizeGitPath(cwd: string | undefined): string {
+        if (!cwd) return process.cwd();
+
+        const normalized = normalize(cwd);
+        // Check for null bytes and newlines which could be used for injection
+        if (normalized.includes('\0') || normalized.includes('\n') || normalized.includes('\r')) {
+            throw new Error('Invalid git directory path: contains forbidden characters');
+        }
+        return normalized;
+    }
+
+    /**
+     * Execute git diff with proper sanitization and error handling
+     */
+    private async getGitDiff(type: 'cached' | 'working'): Promise<string> {
+        try {
+            const { execSync } = await import('child_process');
+            const cwd = this.sanitizeGitPath(this.config?.rootDir);
+            const flag = type === 'cached' ? '--cached' : '';
+
+            return execSync(
+                `git diff ${flag} --name-only`,
+                {
+                    cwd,
+                    encoding: 'utf-8',
+                    maxBuffer: 1024 * 1024, // 1MB
+                    stdio: ['ignore', 'pipe', 'pipe'],
+                    timeout: 5000, // 5 second timeout
+                }
+            ).trim();
+        } catch (error) {
+            // Log warning but don't crash - git may not be available
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            console.warn(`Git command failed: ${errorMessage}`);
+            return '';
+        }
+    }
+
+    /**
      * Initialize the context builder for a project
      */
     async initialize(projectDir: string = process.cwd()): Promise<void> {
@@ -53,11 +96,17 @@ export class ContextBuilder {
         this.vectorStore = new VectorStore(dbPath);
         await this.vectorStore.initialize();
 
-        // Load existing graph if available
+        // Load existing graph if available (Fix R6: JSON.parse without try-catch, Fix R10: Use async readFile)
         const graphPath = join(this.config.rootDir, CONTEXTOS_DIR, GRAPH_FILE);
         if (existsSync(graphPath)) {
-            const graphData = JSON.parse(readFileSync(graphPath, 'utf-8'));
-            this.graph.fromJSON(graphData);
+            try {
+                const graphContent = await readFile(graphPath, 'utf-8');
+                const graphData = JSON.parse(graphContent);
+                this.graph.fromJSON(graphData);
+            } catch (error) {
+                console.warn(`Failed to load dependency graph: ${error instanceof Error ? error.message : String(error)}`);
+                // Continue with empty graph
+            }
         }
 
         // Initialize ranker
@@ -113,7 +162,7 @@ export class ContextBuilder {
 
         for (const filePath of files) {
             try {
-                const content = readFileSync(filePath, 'utf-8');
+                const content = await readFile(filePath, 'utf-8'); // Fix R10: Use async readFile
                 const relativePath = relative(rootDir, filePath);
 
                 // Check if file has changed
@@ -143,15 +192,13 @@ export class ContextBuilder {
             }
         }
 
-        // Save graph
+        // Save graph - Fix R10: Use async mkdir and writeFile
         const graphPath = join(rootDir, CONTEXTOS_DIR, GRAPH_FILE);
         const graphDir = join(rootDir, CONTEXTOS_DIR, 'db');
         if (!existsSync(graphDir)) {
-            const { mkdirSync } = await import('fs');
-            mkdirSync(graphDir, { recursive: true });
+            await mkdir(graphDir, { recursive: true });
         }
-        const { writeFileSync } = await import('fs');
-        writeFileSync(graphPath, JSON.stringify(this.graph.toJSON(), null, 2));
+        await writeFile(graphPath, JSON.stringify(this.graph.toJSON(), null, 2), 'utf-8');
 
         return {
             filesIndexed,
@@ -202,6 +249,7 @@ export class ContextBuilder {
 
     /**
      * Infer goal from git diff, enhanced with Gemini when available
+     * Fixed: Uses sanitized git commands to prevent command injection
      */
     private async inferGoal(): Promise<string> {
         let gitDiff = '';
@@ -209,37 +257,38 @@ export class ContextBuilder {
 
         try {
             const { execSync } = await import('child_process');
+            const cwd = this.sanitizeGitPath(this.config?.rootDir);
 
-            // Get staged files
-            const staged = execSync('git diff --cached --name-only', {
-                cwd: this.config?.rootDir,
-                encoding: 'utf-8',
-            });
-            recentFiles = staged.trim().split('\n').filter(Boolean);
+            // Get staged files using sanitized command
+            const staged = await this.getGitDiff('cached');
+            recentFiles = staged.split('\n').filter(Boolean);
 
             // If no staged files, check working directory
             if (recentFiles.length === 0) {
-                const uncommitted = execSync('git diff --name-only', {
-                    cwd: this.config?.rootDir,
-                    encoding: 'utf-8',
-                });
-                recentFiles = uncommitted.trim().split('\n').filter(Boolean);
+                const uncommitted = await this.getGitDiff('working');
+                recentFiles = uncommitted.split('\n').filter(Boolean);
             }
 
-            // Get actual diff content for Gemini analysis
+            // Get actual diff content for Gemini analysis (still using execSync for diff content)
             if (recentFiles.length > 0) {
-                gitDiff = execSync('git diff --cached', {
-                    cwd: this.config?.rootDir,
-                    encoding: 'utf-8',
-                    maxBuffer: 1024 * 1024, // 1MB max
-                });
-
-                if (!gitDiff) {
-                    gitDiff = execSync('git diff', {
-                        cwd: this.config?.rootDir,
+                try {
+                    gitDiff = execSync('git diff --cached', {
+                        cwd,
                         encoding: 'utf-8',
-                        maxBuffer: 1024 * 1024,
+                        maxBuffer: 1024 * 1024, // 1MB max
+                        timeout: 5000,
                     });
+
+                    if (!gitDiff) {
+                        gitDiff = execSync('git diff', {
+                            cwd,
+                            encoding: 'utf-8',
+                            maxBuffer: 1024 * 1024,
+                            timeout: 5000,
+                        });
+                    }
+                } catch {
+                    // Diff content retrieval failed, but we have file names
                 }
             }
         } catch {
@@ -346,13 +395,40 @@ export class ContextBuilder {
     }
 }
 
-// Singleton instance
+// Singleton instance with promise locking to prevent race condition
 let builderInstance: ContextBuilder | null = null;
+let initializationPromise: Promise<ContextBuilder> | null = null;
 
 export async function getContextBuilder(projectDir?: string): Promise<ContextBuilder> {
-    if (!builderInstance) {
-        builderInstance = new ContextBuilder();
-        await builderInstance.initialize(projectDir);
+    // Fast path: already initialized
+    if (builderInstance) {
+        return builderInstance;
     }
-    return builderInstance;
+
+    // Slow path: initialize with promise locking
+    if (!initializationPromise) {
+        initializationPromise = (async () => {
+            try {
+                const instance = new ContextBuilder();
+                await instance.initialize(projectDir);
+                builderInstance = instance;
+                return instance;
+            } catch (error) {
+                // Clear promise on failure to allow retry
+                initializationPromise = null;
+                throw error;
+            }
+        })();
+    }
+
+    return initializationPromise;
+}
+
+/**
+ * Reset the singleton instance (useful for testing)
+ */
+export function resetContextBuilder(): void {
+    builderInstance?.close();
+    builderInstance = null;
+    initializationPromise = null;
 }

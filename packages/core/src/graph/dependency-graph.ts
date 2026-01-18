@@ -205,10 +205,32 @@ export class DependencyGraph {
     /**
      * Deserialize graph from JSON
      */
-    fromJSON(data: DependencyGraphData): void {
-        this.nodes = new Map(data.nodes);
-        this.edges = data.edges;
-        this.lastUpdated = data.lastUpdated;
+    fromJSON(data: DependencyGraphData | null | undefined): void {
+        // Handle null/undefined data
+        if (!data) {
+            this.nodes = new Map();
+            this.edges = [];
+            this.lastUpdated = new Date().toISOString();
+            return;
+        }
+
+        // Handle nodes - could be Map, array of entries, or object
+        if (data.nodes instanceof Map) {
+            this.nodes = data.nodes;
+        } else if (Array.isArray(data.nodes)) {
+            this.nodes = new Map(data.nodes);
+        } else if (data.nodes && typeof data.nodes === 'object') {
+            // Convert plain object to Map
+            this.nodes = new Map(Object.entries(data.nodes));
+        } else {
+            this.nodes = new Map();
+        }
+
+        // Handle edges
+        this.edges = Array.isArray(data.edges) ? data.edges : [];
+
+        // Handle lastUpdated
+        this.lastUpdated = data.lastUpdated || new Date().toISOString();
     }
 
     /**

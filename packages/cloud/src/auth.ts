@@ -1,6 +1,9 @@
 /**
  * API Key Authentication
+ * Fixed: Strong API key validation, removed auto-registration
  */
+
+import { randomBytes, createHash, timingSafeEqual } from 'crypto';
 
 export interface AuthResult {
     valid: boolean;
@@ -31,35 +34,113 @@ const rateLimits: Record<string, number> = {
 const requestWindows = new Map<string, { count: number; resetAt: number }>();
 
 /**
- * Validate API key and check rate limits
+ * Strong API key format validation
+ * - Must start with ctx_
+ * - Must be exactly 36 characters total (ctx_ + 32 random chars)
+ * - Remainder must be alphanumeric
+ * - Must have sufficient entropy (at least 50% unique characters)
  */
-export async function validateApiKey(apiKey: string): Promise<AuthResult> {
-    // Check format
+function validateApiKeyFormat(apiKey: string): boolean {
+    // Check prefix
     if (!apiKey.startsWith('ctx_')) {
+        return false;
+    }
+
+    // Check total length
+    if (apiKey.length !== 36) {
+        return false;
+    }
+
+    // Check remainder is alphanumeric
+    const keyPart = apiKey.slice(4);
+    const alphanumericRegex = /^[A-Za-z0-9]+$/;
+    if (!alphanumericRegex.test(keyPart)) {
+        return false;
+    }
+
+    // Check entropy (at least 50% unique characters to prevent weak keys)
+    const uniqueChars = new Set(keyPart).size;
+    if (uniqueChars < 16) { // 16 unique chars out of 32 = 50%
+        return false;
+    }
+
+    return true;
+}
+
+/**
+ * Register a new API key (explicit registration, no auto-registration)
+ */
+export function registerApiKey(
+    apiKey: string,
+    userId: string,
+    tier: 'free' | 'pro' | 'enterprise' = 'free'
+): { success: boolean; message?: string } {
+    if (!validateApiKeyFormat(apiKey)) {
         return {
-            valid: false,
-            message: 'Invalid API key format',
+            success: false,
+            message: 'Invalid API key format. Must be ctx_ followed by 32 alphanumeric characters with sufficient entropy.',
         };
     }
 
-    // Look up key
-    const keyData = apiKeys.get(apiKey);
-
-    // For demo purposes, accept any valid format key
-    // In production: verify against database
-    if (!keyData) {
-        // Auto-register for demo
-        const userId = `user_${apiKey.slice(4, 12)}`;
-        apiKeys.set(apiKey, {
-            userId,
-            tier: 'free',
-            createdAt: new Date(),
-            lastUsed: new Date(),
-            requestCount: 0,
-        });
+    if (apiKeys.has(apiKey)) {
+        return {
+            success: false,
+            message: 'API key already registered',
+        };
     }
 
-    const userData = apiKeys.get(apiKey)!;
+    apiKeys.set(apiKey, {
+        userId,
+        tier,
+        createdAt: new Date(),
+        lastUsed: new Date(),
+        requestCount: 0,
+    });
+
+    return { success: true };
+}
+
+/**
+ * Validate API key and check rate limits
+ * Fixed: Removed auto-registration, added timing-safe comparison
+ */
+export async function validateApiKey(apiKey: string): Promise<AuthResult> {
+    // Validate format first
+    if (!validateApiKeyFormat(apiKey)) {
+        return {
+            valid: false,
+            message: 'Invalid API key format. Must be ctx_ followed by 32 alphanumeric characters.',
+        };
+    }
+
+    // Look up key in database
+    const keyData = apiKeys.get(apiKey);
+
+    // NO AUTO-REGISTRATION - reject unknown keys
+    if (!keyData) {
+        // Use constant-time comparison to prevent timing attacks
+        try {
+            const dummyHash = createHash('sha256').update('dummy-key-check').digest();
+            const keyHash = createHash('sha256').update(apiKey).digest();
+            timingSafeEqual(dummyHash, keyHash); // Always fails but takes consistent time
+        } catch {
+            // Ignore comparison result
+        }
+
+        return {
+            valid: false,
+            message: 'Invalid API key. Get your key at https://contextos.dev/keys',
+        };
+    }
+
+    const userData = apiKeys.get(apiKey);
+    if (!userData) {
+        return {
+            valid: false,
+            message: 'Invalid API key',
+        };
+    }
+
     userData.lastUsed = new Date();
     userData.requestCount++;
 
@@ -93,15 +174,27 @@ export async function validateApiKey(apiKey: string): Promise<AuthResult> {
 }
 
 /**
- * Generate new API key
+ * Generate new API key with cryptographic randomness
  */
 export function generateApiKey(): string {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let key = 'ctx_';
-    for (let i = 0; i < 32; i++) {
-        key += chars.charAt(Math.floor(Math.random() * chars.length));
+    // Use crypto.randomBytes for secure random generation
+    const randomBytes = Buffer.from(getRandomValues(24)); // 24 bytes = 32 base64 chars
+    const keyPart = randomBytes.toString('base64')
+        .replace(/[+/]/g, '') // Remove + and /
+        .slice(0, 32); // Take first 32 chars
+
+    return `ctx_${keyPart}`;
+}
+
+// Polyfill for Web Crypto API in Node.js
+function getRandomValues(length: number): Uint8Array {
+    if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+        const arr = new Uint8Array(length);
+        crypto.getRandomValues(arr);
+        return arr;
     }
-    return key;
+    // Node.js fallback
+    return require('crypto').randomBytes(length);
 }
 
 /**
@@ -125,4 +218,15 @@ export function getKeyStats(apiKey: string) {
         lastUsed: data.lastUsed.toISOString(),
         totalRequests: data.requestCount,
     };
+}
+
+/**
+ * List all registered keys (admin function)
+ */
+export function listAllKeys(): Array<{ apiKey: string; userId: string; tier: string }> {
+    return Array.from(apiKeys.entries()).map(([apiKey, data]) => ({
+        apiKey,
+        userId: data.userId,
+        tier: data.tier,
+    }));
 }

@@ -5,6 +5,63 @@
  */
 
 import { Command } from 'commander';
+import { join } from 'path';
+import { existsSync, mkdirSync, appendFileSync } from 'fs';
+
+/**
+ * Global error handlers for production stability (Fix G1: Global Error Handlers)
+ */
+
+// Ensure crash log directory exists
+const crashLogDir = join(process.cwd(), '.contextos');
+if (!existsSync(crashLogDir)) {
+    mkdirSync(crashLogDir, { recursive: true });
+}
+const crashLogPath = join(crashLogDir, 'crash.log');
+
+function logCrash(message: string, data?: string): void {
+    const timestamp = new Date().toISOString();
+    const logEntry = `[${timestamp}] ${message}${data ? `\n${data}\n\n` : '\n\n'}`;
+    console.error(logEntry);
+    appendFileSync(crashLogPath, logEntry, 'utf-8');
+}
+
+// Uncaught Exception Handler
+process.on('uncaughtException', (error: Error) => {
+    console.error('❌ UNCAUGHT EXCEPTION:', error.message);
+    console.error('Stack:', error.stack);
+
+    // Log to file if in production
+    if (process.env.NODE_ENV === 'production') {
+        logCrash(`UNCAUGHT EXCEPTION: ${error.message}`, error.stack);
+    }
+
+    // Give time for logging, then exit
+    setTimeout(() => process.exit(1), 1000);
+});
+
+// Unhandled Rejection Handler
+process.on('unhandledRejection', (reason: unknown) => {
+    console.error('❌ UNHANDLED REJECTION:', reason);
+
+    // Log to file if in production
+    if (process.env.NODE_ENV === 'production') {
+        const reasonStr = reason instanceof Error ? reason.stack : String(reason);
+        logCrash('UNHANDLED REJECTION', reasonStr);
+    }
+
+    // Don't exit - keep process running
+});
+
+// Warning: Multiple resolutions of promise
+process.on('multipleResolves', (type, promise) => {
+    console.warn('⚠️  MULTIPLE RESOLVES:', type, promise);
+});
+
+// Warning: Unhandled promise rejection
+process.on('warning', (warning) => {
+    console.warn('⚠️  PROCESS WARNING:', warning.name, warning.message);
+});
 import { initCommand } from './commands/init.js';
 import { indexCommand } from './commands/index.js';
 import { buildCommand } from './commands/build.js';

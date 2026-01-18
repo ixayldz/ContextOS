@@ -1,11 +1,11 @@
 /**
  * Proposal System (Transaction Layer)
- * 
+ *
  * Implements the expert recommendation for "Transactional File System Layer"
  * Agents produce Proposals instead of direct writes; Merge Manager validates and applies
  */
 
-import { createHash } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
 
 /**
  * Represents a proposed change to a file
@@ -269,7 +269,11 @@ export class ProposalManager {
 
     // Private helpers
     private generateId(): string {
-        return `prop_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+        // Use cryptographically secure random bytes (Fix N4: Weak Random ID)
+        const bytes = randomBytes(16);
+        const hex = bytes.toString('hex');
+        const timestamp = Date.now().toString(36);
+        return `prop_${timestamp}_${hex.substring(0, 16)}`;
     }
 
     private hashContent(content: string): string {

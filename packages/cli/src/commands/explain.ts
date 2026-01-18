@@ -7,12 +7,26 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import ora from 'ora';
 import { readFileSync, existsSync, statSync } from 'fs';
-import { join, basename } from 'path';
+import { join, basename, resolve, normalize } from 'path';
 import {
     RLMEngine,
     createGeminiClient,
     mergeFilesToContext,
 } from '@contextos/core';
+
+/**
+ * Validate path doesn't escape project boundaries (Fix N2: Path Traversal)
+ */
+function validatePath(userPath: string, projectRoot: string): string {
+    const resolved = resolve(projectRoot, userPath);
+    const normalized = normalize(resolved);
+    const rootNormalized = normalize(projectRoot);
+
+    if (!normalized.startsWith(rootNormalized)) {
+        throw new Error(`Path traversal detected: "${userPath}" escapes project boundaries`);
+    }
+    return normalized;
+}
 
 export const explainCommand = new Command('explain')
     .description('Get AI-powered explanation of code')
@@ -31,6 +45,19 @@ export const explainCommand = new Command('explain')
             let targetPath = '';
             let contextFiles: Array<{ path: string; content: string }> = [];
 
+            // Validate path before accessing (Fix N2: Path Traversal)
+            let safePath: string;
+            try {
+                safePath = validatePath(target, process.cwd());
+            } catch (error) {
+                if (error instanceof Error && error.message.includes('Path traversal')) {
+                    spinner.fail('Invalid path');
+                    console.log(chalk.red('Error:'), error.message);
+                    process.exit(1);
+                }
+                throw error;
+            }
+
             // Determine if target is a file path or symbol name
             const possiblePath = join(process.cwd(), target);
 
@@ -40,10 +67,10 @@ export const explainCommand = new Command('explain')
                 targetContent = readFileSync(possiblePath, 'utf-8');
                 contextFiles.push({ path: target, content: targetContent });
                 spinner.text = `Found file: ${target}`;
-            } else if (existsSync(target) && statSync(target).isFile()) {
-                // Absolute path
+            } else if (existsSync(safePath) && statSync(safePath).isFile()) {
+                // Absolute path (validated)
                 targetPath = target;
-                targetContent = readFileSync(target, 'utf-8');
+                targetContent = readFileSync(safePath, 'utf-8');
                 contextFiles.push({ path: basename(target), content: targetContent });
                 spinner.text = `Found file: ${target}`;
             } else {

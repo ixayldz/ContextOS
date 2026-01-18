@@ -4,7 +4,7 @@
  */
 
 import { existsSync, readdirSync, readFileSync, mkdirSync, rmSync, writeFileSync } from 'fs';
-import { join, resolve } from 'path';
+import { join, resolve, normalize } from 'path';
 import type {
     Plugin,
     PluginManifest,
@@ -70,6 +70,16 @@ export class PluginManager {
      * Load a single plugin from path
      */
     async loadPlugin(pluginPath: string): Promise<Plugin> {
+        // Validate plugin path stays within plugins directory (Fix N3: Path Traversal)
+        const absolutePluginPath = resolve(pluginPath);
+        const absolutePluginsDir = resolve(this.pluginsDir);
+        const normalizedPlugin = normalize(absolutePluginPath);
+        const normalizedPluginsDir = normalize(absolutePluginsDir);
+
+        if (!normalizedPlugin.startsWith(normalizedPluginsDir)) {
+            throw new Error(`Plugin path "${pluginPath}" is outside plugins directory`);
+        }
+
         const manifestPath = join(pluginPath, 'package.json');
 
         if (!existsSync(manifestPath)) {
@@ -77,7 +87,16 @@ export class PluginManager {
         }
 
         const manifestContent = readFileSync(manifestPath, 'utf-8');
-        const manifest: PluginManifest = JSON.parse(manifestContent);
+
+        let manifest: PluginManifest;
+        try {
+            manifest = JSON.parse(manifestContent);
+        } catch (error) {
+            throw new Error(
+                `Failed to parse plugin manifest at ${manifestPath}: ${error instanceof Error ? error.message : String(error)}\n` +
+                `The file may contain invalid JSON.`
+            );
+        }
 
         // Validate manifest
         if (!manifest.name || !manifest.version || !manifest.main) {
@@ -200,8 +219,16 @@ export class PluginManager {
             }
             mkdirSync(targetDir, { recursive: true });
 
-            // Copy package.json and main file
-            const manifest = JSON.parse(readFileSync(join(sourcePath, 'package.json'), 'utf-8'));
+            // Copy package.json and main file (Fix N5: JSON.parse without try-catch)
+            let manifest: { main: string };
+            try {
+                const manifestContent = readFileSync(join(sourcePath, 'package.json'), 'utf-8');
+                manifest = JSON.parse(manifestContent);
+            } catch (error) {
+                throw new Error(
+                    `Failed to parse plugin manifest at ${sourcePath}: ${error instanceof Error ? error.message : String(error)}`
+                );
+            }
             writeFileSync(join(targetDir, 'package.json'), JSON.stringify(manifest, null, 2));
 
             const mainContent = readFileSync(join(sourcePath, manifest.main), 'utf-8');
@@ -378,7 +405,12 @@ ${commandsCode}
         if (!this.storage.has(pluginName)) {
             this.storage.set(pluginName, new Map());
         }
-        const pluginStorage = this.storage.get(pluginName)!;
+        const pluginStorage = this.storage.get(pluginName);
+
+        // This should never be null due to the has check above, but TypeScript doesn't know that
+        if (!pluginStorage) {
+            throw new Error(`Failed to get plugin storage for ${pluginName}`);
+        }
 
         return {
             projectRoot: this.projectRoot,
@@ -397,8 +429,16 @@ ${commandsCode}
             },
 
             readFile: async (path: string) => {
-                const fullPath = join(this.projectRoot, path);
-                return readFileSync(fullPath, 'utf-8');
+                // Resolve and validate path stays within project root (Fix N1: Path Traversal)
+                const fullPath = resolve(this.projectRoot, path);
+                const normalized = normalize(fullPath);
+                const rootNormalized = normalize(this.projectRoot);
+
+                if (!normalized.startsWith(rootNormalized)) {
+                    throw new Error(`Path traversal detected: "${path}" escapes project boundaries`);
+                }
+
+                return readFileSync(normalized, 'utf-8');
             },
 
             getDependencies: async (_path: string, _depth = 2) => {

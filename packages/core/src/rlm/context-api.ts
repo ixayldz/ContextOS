@@ -296,6 +296,17 @@ export function createContextAPI(rawContext: string): ContextQueryAPI {
         },
 
         getFile: (path: string) => {
+            // Fix N10: ReDoS protection - limit path length and validate characters
+            const MAX_PATH_LENGTH = 1000;
+            if (path.length > MAX_PATH_LENGTH) {
+                return null;
+            }
+
+            // Validate path contains only safe characters
+            if (!/^[\w\-./\\]+$/.test(path)) {
+                return null;
+            }
+
             const escapedPath = path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             const pattern = new RegExp(
                 `^={3,}\\s*FILE:\\s*${escapedPath}\\s*={3,}$([\\s\\S]*?)(?=^={3,}\\s*FILE:|$)`,

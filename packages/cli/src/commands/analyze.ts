@@ -6,8 +6,9 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import ora from 'ora';
-import { readFileSync, readdirSync, statSync } from 'fs';
-import { join, relative } from 'path';
+import { readdirSync, statSync } from 'fs';
+import { readFile } from 'fs/promises';
+import { join, relative, resolve, normalize } from 'path';
 import {
     getContextBuilder,
     RLMEngine,
@@ -16,19 +17,47 @@ import {
 } from '@contextos/core';
 
 /**
- * Recursively collect all code files from a directory
+ * Validate that a path doesn't escape project boundaries (prevents path traversal)
  */
-function collectFiles(
+function validatePath(userPath: string, projectRoot: string): string {
+    const resolved = resolve(projectRoot, userPath);
+    const normalized = normalize(resolved);
+    const rootNormalized = normalize(projectRoot);
+
+    if (!normalized.startsWith(rootNormalized)) {
+        throw new Error(
+            `Invalid path: "${userPath}" escapes project boundaries.\n` +
+            `Path must be within: ${rootNormalized}`
+        );
+    }
+    return normalized;
+}
+
+/**
+ * Recursively collect all code files from a directory
+ * Fixed: Added depth tracking to prevent stack overflow, async file I/O for non-blocking
+ */
+async function collectFiles(
     dir: string,
     extensions: string[] = ['.ts', '.js', '.tsx', '.jsx', '.py', '.go', '.rs', '.java'],
-    maxFiles: number = 100
-): Array<{ path: string; content: string }> {
+    maxFiles: number = 100,
+    maxDepth: number = 20
+): Promise<Array<{ path: string; content: string }>> {
     const files: Array<{ path: string; content: string }> = [];
 
-    function walk(currentDir: string) {
+    async function walk(currentDir: string, depth: number): Promise<void> {
+        // Depth limit check to prevent stack overflow
+        if (depth > maxDepth) {
+            console.warn(`Maximum depth (${maxDepth}) reached at ${currentDir}. Skipping deeper directories.`);
+            return;
+        }
+
         if (files.length >= maxFiles) return;
 
         const entries = readdirSync(currentDir, { withFileTypes: true });
+
+        // Process files concurrently (up to 10 at a time)
+        const filePromises: Promise<void>[] = [];
 
         for (const entry of entries) {
             if (files.length >= maxFiles) break;
@@ -40,25 +69,41 @@ function collectFiles(
                 if (['node_modules', '.git', 'dist', 'build', '.next', '__pycache__', 'venv'].includes(entry.name)) {
                     continue;
                 }
-                walk(fullPath);
+                // Walk subdirectory sequentially to avoid too much concurrency
+                await walk(fullPath, depth + 1);
             } else if (entry.isFile()) {
                 const ext = entry.name.substring(entry.name.lastIndexOf('.'));
                 if (extensions.includes(ext)) {
-                    try {
-                        const content = readFileSync(fullPath, 'utf-8');
-                        files.push({
-                            path: relative(dir, fullPath),
-                            content,
-                        });
-                    } catch {
-                        // Skip unreadable files
+                    // Async file read (non-blocking)
+                    const promise = (async () => {
+                        try {
+                            const content = await readFile(fullPath, 'utf-8');
+                            files.push({
+                                path: relative(dir, fullPath),
+                                content,
+                            });
+                        } catch {
+                            // Skip unreadable files
+                        }
+                    })();
+                    filePromises.push(promise);
+
+                    // Batch concurrent reads to avoid overwhelming the file system
+                    if (filePromises.length >= 10) {
+                        await Promise.all(filePromises);
+                        filePromises.length = 0;
                     }
                 }
             }
         }
+
+        // Wait for remaining file reads
+        if (filePromises.length > 0) {
+            await Promise.all(filePromises);
+        }
     }
 
-    walk(dir);
+    await walk(dir, 0);
     return files;
 }
 
@@ -69,6 +114,7 @@ export const analyzeCommand = new Command('analyze')
     .option('-b, --budget <tokens>', 'Token budget for analysis', '50000')
     .option('-p, --path <path>', 'Path to analyze (default: current directory)', '.')
     .option('--max-files <number>', 'Maximum files to include', '100')
+    .option('--max-depth <number>', 'Maximum directory depth to traverse', '20')
     .option('--verbose', 'Show detailed execution trace')
     .action(async (goal, options) => {
         console.log(chalk.blue.bold('\n🔍 RLM Analysis Engine\n'));
@@ -78,8 +124,11 @@ export const analyzeCommand = new Command('analyze')
         const spinner = ora('Collecting codebase files...').start();
 
         try {
-            // Collect files
-            const files = collectFiles(options.path, undefined, parseInt(options.maxFiles));
+            // Validate path to prevent traversal attacks
+            const safePath = validatePath(options.path, process.cwd());
+
+            // Collect files (async, non-blocking)
+            const files = await collectFiles(safePath, undefined, parseInt(options.maxFiles), parseInt(options.maxDepth));
             spinner.text = `Found ${files.length} files. Building context...`;
 
             if (files.length === 0) {

@@ -1,6 +1,7 @@
 /**
  * Anthropic Model Adapter
  * Adapter for Claude 4.5 Opus and other models
+ * Fixed: Added rate limiting to prevent API quota exhaustion
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -9,6 +10,7 @@ declare const fetch: typeof globalThis.fetch;
 
 import type { ModelAdapter, CompletionRequest, CompletionResponse } from './types.js';
 import { getModelContextSize, estimateTokens } from './types.js';
+import { RateLimiter, getDefaultRateLimit } from './rate-limiter.js';
 
 /**
  * Anthropic Adapter for ContextOS RLM Engine
@@ -20,19 +22,25 @@ export class AnthropicAdapter implements ModelAdapter {
     private apiKey: string;
     private model: string;
     private baseUrl: string;
+    private rateLimiter: RateLimiter;
 
     constructor(options: {
         apiKey?: string;
         model?: string;
         baseUrl?: string;
+        requestsPerMinute?: number;
     } = {}) {
         this.apiKey = options.apiKey || process.env.ANTHROPIC_API_KEY || '';
         this.model = options.model || 'claude-4.5-opus-20260115';
         this.baseUrl = options.baseUrl || 'https://api.anthropic.com';
         this.maxContextTokens = getModelContextSize('anthropic', this.model);
+
+        // Initialize rate limiter with Anthropic default limits
+        const rateLimit = options.requestsPerMinute || getDefaultRateLimit('anthropic', this.model);
+        this.rateLimiter = new RateLimiter({ requestsPerMinute: rateLimit });
     }
 
-    async complete(request: CompletionRequest): Promise<CompletionResponse> {
+    async complete(request: CompletionRequest, retryCount: number = 0): Promise<CompletionResponse> {
         if (!this.apiKey) {
             return {
                 content: '',
@@ -41,6 +49,9 @@ export class AnthropicAdapter implements ModelAdapter {
                 error: 'Anthropic API key not configured. Set ANTHROPIC_API_KEY environment variable.',
             };
         }
+
+        // Wait for rate limiter slot
+        await this.rateLimiter.waitForSlot();
 
         try {
             const response = await fetch(`${this.baseUrl}/v1/messages`, {
@@ -62,11 +73,33 @@ export class AnthropicAdapter implements ModelAdapter {
                 }),
             });
 
+            // Handle rate limiting (429)
+            if (response.status === 429) {
+                const retryAfter = response.headers.get('Retry-After');
+                const waitTime = retryAfter ? parseInt(retryAfter) * 1000 : 60000;
+
+                if (retryCount < 3) {
+                    console.warn(`Anthropic rate limited. Waiting ${waitTime}ms before retry (${retryCount + 1}/3)...`);
+                    await new Promise(resolve => setTimeout(resolve, waitTime));
+                    return this.complete(request, retryCount + 1);
+                }
+
+                return {
+                    content: '',
+                    tokensUsed: { prompt: 0, completion: 0, total: 0 },
+                    finishReason: 'error',
+                    error: `Rate limit exceeded after ${retryCount} retries`,
+                };
+            }
+
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
-                throw new Error(
-                    `Anthropic API error: ${response.status} - ${JSON.stringify(errorData)}`
-                );
+                return {
+                    content: '',
+                    tokensUsed: { prompt: 0, completion: 0, total: 0 },
+                    finishReason: 'error',
+                    error: `Anthropic API error: ${response.status} - ${JSON.stringify(errorData)}`,
+                };
             }
 
             const data = await response.json() as {

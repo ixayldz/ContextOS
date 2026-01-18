@@ -341,13 +341,39 @@ export class ASTParser {
     }
 }
 
-// Singleton instance
+// Singleton instance with promise locking to prevent race condition (Fix R5)
 let parserInstance: ASTParser | null = null;
+let initializationPromise: Promise<ASTParser> | null = null;
 
 export async function getParser(): Promise<ASTParser> {
-    if (!parserInstance) {
-        parserInstance = new ASTParser();
-        await parserInstance.initialize();
+    // Fast path: already initialized
+    if (parserInstance) {
+        return parserInstance;
     }
-    return parserInstance;
+
+    // Slow path: initialize with promise locking
+    if (!initializationPromise) {
+        initializationPromise = (async () => {
+            try {
+                const instance = new ASTParser();
+                await instance.initialize();
+                parserInstance = instance;
+                return instance;
+            } catch (error) {
+                // Clear promise on failure to allow retry
+                initializationPromise = null;
+                throw error;
+            }
+        })();
+    }
+
+    return initializationPromise;
+}
+
+/**
+ * Reset the parser singleton (useful for testing)
+ */
+export function resetParser(): void {
+    parserInstance = null;
+    initializationPromise = null;
 }

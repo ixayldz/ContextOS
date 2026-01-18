@@ -77,5 +77,9 @@ export * from './errors.js';
 // Logger
 export * from './logger.js';
 
+// AI Generator
+export * from './generator/index.js';
+
 // Types
 export * from './types.js';
+

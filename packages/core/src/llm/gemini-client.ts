@@ -360,6 +360,19 @@ Output the compressed version directly.`;
             tokensSaved: originalTokens - newTokens,
         };
     }
+
+    /**
+     * Generate code or content from a prompt
+     * Used by AIGenerator for code generation
+     */
+    async generate(prompt: string): Promise<{ text: string; tokensUsed: number }> {
+        const response = await this.request(prompt);
+
+        return {
+            text: response,
+            tokensUsed: Math.ceil(response.length / 4), // Rough estimate
+        };
+    }
 }
 
 /**

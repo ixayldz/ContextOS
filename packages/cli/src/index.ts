@@ -78,6 +78,7 @@ import { traceCommand } from './commands/trace.js';
 import { registerPluginCommand } from './commands/plugin.js';
 import { registerFinetuneCommand } from './commands/finetune.js';
 import { registerCloudCommands } from './commands/cloud.js';
+import { registerGenerateCommands } from './commands/generate.js';
 
 const program = new Command();
 
@@ -106,7 +107,9 @@ program.addCommand(traceCommand);
 registerPluginCommand(program);
 registerFinetuneCommand(program);
 registerCloudCommands(program);
+registerGenerateCommands(program);
 
 // Parse and execute
 program.parse();
+
 

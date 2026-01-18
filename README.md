@@ -272,15 +272,27 @@ const deps = ctx.getDependencies('AuthService');
 | `ctx finetune validate` | Dataset doğrula |
 | `ctx finetune stats` | İstatistikleri göster |
 
+### 🤖 AI Code Generation
+
+| Komut | Açıklama |
+|-------|----------|
+| `ctx generate "<prompt>"` | AI ile kod oluştur |
+| `ctx generate --dry-run` | Önizleme (dosya yazmaz) |
+| `ctx fix "<prompt>"` | AI ile bug düzelt |
+| `ctx fix --file <path>` | Belirli dosyayı düzelt |
+
 ### Örnek Senaryolar
 
 ```bash
-# Yeni özellik ekleme
-ctx goal "JWT tabanlı authentication sistemi ekle"
-ctx copy
+# 🤖 AI ile kod oluştur (YENİ!)
+ctx generate "PRD'ye göre Express REST API oluştur"
+ctx generate "Login ve register sayfaları oluştur"
 
-# Bug düzeltme
-ctx goal "Login endpoint 500 hatası veriyor"
+# 🔧 AI ile bug düzelt (YENİ!)
+ctx fix "Authentication 401 hatası veriyor"
+
+# Context oluştur + AI'a yapıştır
+ctx goal "JWT tabanlı authentication sistemi ekle"
 ctx copy
 
 # Kod inceleme

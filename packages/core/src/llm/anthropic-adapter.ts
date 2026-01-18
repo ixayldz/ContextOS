@@ -62,7 +62,7 @@ export class AnthropicAdapter implements ModelAdapter {
                     'anthropic-version': '2023-06-01',
                 },
                 body: JSON.stringify({
-                    model: this.model,
+                    model: request.model ?? this.model,
                     max_tokens: request.maxTokens ?? 4000,
                     system: request.systemPrompt,
                     messages: [

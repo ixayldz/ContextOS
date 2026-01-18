@@ -265,6 +265,9 @@ export interface CompletionRequest {
 
     /** Stop sequences */
     stopSequences?: string[];
+
+    /** Specific model to use (overrides adapter default) */
+    model?: string;
 }
 
 export interface CompletionResponse {

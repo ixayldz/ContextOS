@@ -135,8 +135,8 @@ export class AIGenerator {
                 const result = await this.anthropic.complete({
                     systemPrompt: 'You are an expert software developer. Generate clean, production-ready code.',
                     userMessage: fullPrompt,
-                    maxTokens: 8000,
-                    model: 'claude-3-5-sonnet-20240620' // Default to 3.5 Sonnet
+                    maxTokens: 4096,
+                    model: 'claude-4.5-opus-20260115' // Claude 4.5 Opus
                 });
                 response = result.content;
                 tokensUsed = result.tokensUsed.total;
